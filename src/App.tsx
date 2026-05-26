@@ -99,6 +99,7 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
+  const [guestMode, setGuestMode] = useState(false);
 
   // Estado del cargador general
   const [loading, setLoading] = useState(false);
@@ -262,6 +263,7 @@ export default function App() {
       if (error) throw error;
       setSession(null);
       setIsSyncingWithSupabase(false);
+      setGuestMode(false);
       triggerAlert("info", "Cloud Sync pausado. Se han restablecido los datos locales offline.");
     } catch (err: any) {
       triggerAlert("error", "Error al pausar sincronización: " + err.message);
@@ -1162,7 +1164,344 @@ export default function App() {
   };
 
 
+  const renderLandingPage = () => {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-emerald-500 selection:text-white overflow-x-hidden">
+        {/* Navigation Bar */}
+        <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-900/30">
+                <Carrot className="w-5 h-5 animate-pulse" />
+              </div>
+              <span className="text-xl font-black tracking-tight text-white">Despensia</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => {
+                  setGuestMode(true);
+                  triggerAlert("info", "Has entrado en Modo Invitado. Los datos se guardarán localmente.");
+                }}
+                className="text-xs font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wider cursor-pointer"
+              >
+                Probar Demo Local
+              </button>
+              <a
+                href="#auth-panel"
+                className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-extrabold px-4.5 py-2 rounded-xl shadow-md transition-all uppercase tracking-wider"
+              >
+                Comenzar gratis
+              </a>
+            </div>
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <section className="relative pt-20 pb-24 overflow-hidden">
+          {/* Background decorative glows */}
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[120px] pointer-events-none" />
+          <div className="absolute top-1/2 left-10 w-[300px] h-[300px] bg-teal-500/10 rounded-full blur-[100px] pointer-events-none" />
+
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+              
+              {/* Left Column: Heading & CTAs */}
+              <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
+                <div className="inline-flex items-center gap-2 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1 rounded-full text-emerald-400 text-xs font-semibold">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Potenciado con Gemini 3.5 Flash</span>
+                </div>
+                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
+                  Gestiona tu despensa. <br />
+                  <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
+                    Cocina sin desperdiciar.
+                  </span>
+                </h1>
+                <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-medium">
+                  Organiza tus ingredientes en casa, escanea recibos del supermercado con tu cámara, agenda menús semanales y genera deliciosas recetas personalizadas por Inteligencia Artificial con lo que tienes en stock.
+                </p>
+
+                <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                  <a
+                    href="#auth-panel"
+                    className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-sm px-8 py-4 rounded-xl shadow-lg hover:shadow-emerald-900/20 transition-all flex items-center gap-2 group"
+                  >
+                    <span>Comenzar gratis (Nube)</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </a>
+                  <button
+                    onClick={() => {
+                      setGuestMode(true);
+                      triggerAlert("info", "Has entrado en Modo Invitado. Los datos se guardarán localmente.");
+                    }}
+                    className="bg-slate-800/80 hover:bg-slate-850 active:scale-95 text-slate-200 font-bold text-sm px-6 py-4 rounded-xl border border-slate-700/60 transition-all shadow-sm cursor-pointer"
+                  >
+                    Probar Demo sin Registro
+                  </button>
+                </div>
+
+                <div className="pt-4 flex justify-center lg:justify-start items-center gap-6 divide-x divide-slate-800">
+                  <div>
+                    <span className="block text-2xl font-extrabold text-white">100%</span>
+                    <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Cero Desperdicio</span>
+                  </div>
+                  <div className="pl-6">
+                    <span className="block text-2xl font-extrabold text-white">Gemini</span>
+                    <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Análisis Multimodal</span>
+                  </div>
+                  <div className="pl-6">
+                    <span className="block text-2xl font-extrabold text-white">Cloud Sync</span>
+                    <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Acceso Móvil Real</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Visual Mockup Showcase */}
+              <div className="lg:col-span-5 relative w-full max-w-md mx-auto lg:max-w-none">
+                <div className="relative z-10 space-y-4">
+                  {/* Miniature Pantry Card */}
+                  <div className="bg-slate-850/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex items-center justify-between hover:translate-x-2 transition-transform duration-300 backdrop-blur-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
+                        <AlertTriangle className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Poco Stock en Despensa</h4>
+                        <p className="text-sm font-bold text-white mt-0.5">Tomates frescos: 2 uds</p>
+                      </div>
+                    </div>
+                    <span className="bg-rose-950 text-rose-400 text-[10px] font-extrabold px-2.5 py-1 rounded-md border border-rose-900/60 font-mono">
+                      ⚠️ Reponer
+                    </span>
+                  </div>
+
+                  {/* Miniature Gemini suggestion Card */}
+                  <div className="bg-slate-855/95 border border-emerald-500/40 p-6 rounded-3xl shadow-2xl space-y-4 relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300 backdrop-blur-xs">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl" />
+                    <div className="flex items-center justify-between">
+                      <span className="bg-emerald-950 text-emerald-400 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-emerald-900/50 flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-emerald-400" /> Gemini Chef
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-semibold font-mono">350 kcal</span>
+                    </div>
+                    <div>
+                      <h4 className="text-base font-black text-white tracking-tight">Fajitas de Pollo Fit</h4>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">Sugerencia inteligente basada en tu stock (Pollo y Tomates).</p>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <span className="text-[9px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded border border-slate-750">Pechuga de Pollo</span>
+                      <span className="text-[9px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded border border-slate-750">Tomates</span>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setGuestMode(true);
+                        triggerAlert("info", "Iniciando preparación en modo Invitado.");
+                      }}
+                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] uppercase tracking-wider py-2.5 rounded-xl flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Play className="w-3 h-3 fill-white" /> Cocinar en Vivo
+                    </button>
+                  </div>
+
+                  {/* Miniature Weekly Planner card */}
+                  <div className="bg-slate-850/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex items-center justify-between hover:-translate-x-2 transition-transform duration-300 backdrop-blur-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
+                        <Calendar className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Plan Semanal</h4>
+                        <p className="text-sm font-bold text-white mt-0.5">Comida agendada para el Miércoles</p>
+                      </div>
+                    </div>
+                    <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2.5 py-1 rounded-md font-mono border border-slate-700/60">
+                      Miércoles
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* Features details Section */}
+        <section className="py-24 border-t border-slate-800/80 bg-slate-950/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-3xl mx-auto space-y-4 mb-16">
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">Características Principales</span>
+              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Todo lo que necesitas para tu cocina digital</h2>
+              <p className="text-sm sm:text-base leading-relaxed text-slate-400">
+                Despensia combina análisis visual multimodal de tickets, sugerencias de chefs de inteligencia artificial y planificación de menús en una sola interfaz premium.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Feature 1 */}
+              <div className="bg-slate-850/40 border border-slate-800/80 rounded-2xl p-6 hover:shadow-lg hover:border-slate-700/60 transition-all duration-300 hover:-translate-y-1">
+                <div className="w-12 h-12 bg-emerald-600/10 border border-emerald-600/20 text-emerald-400 rounded-xl flex items-center justify-center mb-6">
+                  <Camera className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Escáner de Tickets Multimodal</h3>
+                <p className="text-xs sm:text-sm text-slate-450 leading-relaxed text-slate-450">
+                  ¿Has vuelto de la compra? Hazle una foto al ticket. Nuestro motor Gemini extrae automáticamente los productos, cantidades y unidades, categorizando tu despensa sin esfuerzo manual.
+                </p>
+              </div>
+
+              {/* Feature 2 */}
+              <div className="bg-slate-850/40 border border-slate-800/80 rounded-2xl p-6 hover:shadow-lg hover:border-slate-700/60 transition-all duration-300 hover:-translate-y-1">
+                <div className="w-12 h-12 bg-amber-600/10 border border-amber-600/20 text-amber-400 rounded-xl flex items-center justify-center mb-6">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Chef IA Personalizado</h3>
+                <p className="text-xs sm:text-sm text-slate-450 leading-relaxed text-slate-450">
+                  No pienses más qué hacer de cenar. Selecciona qué ingredientes de tu despensa quieres consumir y Gemini diseñará una receta deliciosa detallando calorías, macros e instrucciones precisas.
+                </p>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="bg-slate-850/40 border border-slate-800/80 rounded-2xl p-6 hover:shadow-lg hover:border-slate-700/60 transition-all duration-300 hover:-translate-y-1">
+                <div className="w-12 h-12 bg-teal-600/10 border border-teal-600/20 text-teal-400 rounded-xl flex items-center justify-center mb-6">
+                  <Calendar className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-white mb-2">Planificador & Cocina Live</h3>
+                <p className="text-xs sm:text-sm text-slate-450 leading-relaxed text-slate-450">
+                  Planifica tu menú por adelantado. Al cocinar, sigue las instrucciones paso a paso con temporizadores inteligentes y deja que la aplicación descuente automáticamente las raciones reales de tu stock.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Authentication Panel */}
+        <section id="auth-panel" className="py-24 relative overflow-hidden bg-slate-950/10">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none" />
+          
+          <div className="max-w-md mx-auto px-4 relative z-10 text-center">
+            
+            <div className="bg-slate-850/90 border border-slate-800 p-8 rounded-3xl shadow-2xl backdrop-blur-md">
+              <div className="mx-auto w-12 h-12 bg-emerald-600/10 border border-emerald-600/20 text-emerald-400 rounded-full flex items-center justify-center shadow-inner mb-4">
+                <Cloud className="w-6 h-6" />
+              </div>
+              <h2 className="text-2xl font-black text-white tracking-tight">Accede a tu Despensa Cloud</h2>
+              <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+                Crea una cuenta en la nube para sincronizar tus alimentos y planes semanales en tu móvil y cualquier navegador en tiempo real.
+              </p>
+
+              {/* Tabs selector */}
+              <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-xl my-6">
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(false)}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors uppercase tracking-wider cursor-pointer ${
+                    !isSignUp ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Iniciar Sesión
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(true)}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition-colors uppercase tracking-wider cursor-pointer ${
+                    isSignUp ? "bg-emerald-600 text-white shadow-sm" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Registrarse
+                </button>
+              </div>
+
+              {/* Form */}
+              <form onSubmit={handleAuthSubmit} className="space-y-4 text-left">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Correo Electrónico</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <Mail className="h-4 w-4 text-slate-500" />
+                    </div>
+                    <input
+                      type="email"
+                      required
+                      value={authEmail}
+                      onChange={(e) => setAuthEmail(e.target.value)}
+                      placeholder="ejemplo@correo.com"
+                      className="block w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-slate-900/60 transition-all text-slate-200"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Contraseña</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                      <Lock className="h-4 w-4 text-slate-500" />
+                    </div>
+                    <input
+                      type="password"
+                      required
+                      minLength={6}
+                      value={authPassword}
+                      onChange={(e) => setAuthPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                      className="block w-full pl-10 pr-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-emerald-500 focus:bg-slate-900/60 transition-all text-slate-200"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl shadow-lg transition-all uppercase tracking-wider flex items-center justify-center gap-1.5 active:scale-98 cursor-pointer"
+                >
+                  {authLoading ? (
+                    <RefreshCw className="animate-spin w-4 h-4 text-white" />
+                  ) : isSignUp ? (
+                    "Crear cuenta Cloud"
+                  ) : (
+                    "Entrar / Vincular"
+                  )}
+                </button>
+              </form>
+
+              {/* Demo local Option */}
+              <div className="mt-8 pt-6 border-t border-slate-800 text-center space-y-3">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">¿Quieres probar antes?</span>
+                <button
+                  onClick={() => {
+                    setGuestMode(true);
+                    triggerAlert("info", "Has entrado en Modo Invitado. Los datos se guardarán localmente.");
+                  }}
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl py-3 px-4 text-xs font-bold transition-all cursor-pointer"
+                >
+                  Probar Demo Local (Sin Registro)
+                </button>
+                <p className="text-[9px] text-slate-500 leading-normal">
+                  Accederás al modo de demostración. Los datos se guardarán localmente en el servidor pero no se sincronizarán con la nube.
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        {/* Footer */}
+        <footer className="border-t border-slate-800 bg-slate-950 py-12 text-center text-xs text-slate-500 font-mono">
+          <div className="max-w-7xl mx-auto px-4 space-y-4">
+            <div className="flex justify-center items-center gap-2">
+              <Carrot className="w-4 h-4 text-emerald-500 animate-bounce" />
+              <span className="font-sans font-black text-slate-300">Despensia</span>
+            </div>
+            <p>Despensia App 🍓 — AI Studio Build 2026. Todos los derechos reservados.</p>
+          </div>
+        </footer>
+      </div>
+    );
+  };
+
   // --- RENDER ---
+  if (!session?.user && !guestMode) {
+    return renderLandingPage();
+  }
+
   return (
     <div id="despensia-container" className="min-h-screen bg-slate-50 text-slate-900 font-sans leading-normal">
       
@@ -1188,6 +1527,15 @@ export default function App() {
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto justify-end">
             {/* CONTROL DE SINCRONIZACIÓN CLOUD / MÓVIL */}
             <div className="flex items-center gap-2">
+              {!session?.user && guestMode && (
+                <button
+                  onClick={() => setGuestMode(false)}
+                  className="bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-extrabold text-[10px] px-3.5 py-2.5 rounded-xl shadow-xs transition-all cursor-pointer uppercase tracking-wider border border-slate-200 mr-1.5"
+                  title="Cerrar el modo invitado y volver a la página de bienvenida"
+                >
+                  Volver a Inicio
+                </button>
+              )}
               {session?.user ? (
                 <div className="flex items-center gap-2.5 bg-emerald-55 border border-emerald-100 px-3.5 py-1.5 rounded-xl shadow-2xs">
                   <div className="relative flex h-2 w-2">

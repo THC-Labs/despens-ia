@@ -28,7 +28,7 @@ const ai = new GoogleGenAI({
 });
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json());
 
@@ -203,6 +203,7 @@ app.post("/api/meal-plan", (req, res) => {
   const newItem = {
     id: "mp_" + Math.random().toString(36).substring(2, 9),
     date: req.body.date,
+    plannerDay: req.body.plannerDay || "Lunes",
     meal_type: req.body.meal_type || "Comida",
     recipe_id: req.body.recipe_id,
     status: req.body.status || "planned"
@@ -220,6 +221,7 @@ app.put("/api/meal-plan/:id", (req, res) => {
       ...db.meal_plan[idx],
       status: req.body.status !== undefined ? req.body.status : db.meal_plan[idx].status,
       date: req.body.date !== undefined ? req.body.date : db.meal_plan[idx].date,
+      plannerDay: req.body.plannerDay !== undefined ? req.body.plannerDay : db.meal_plan[idx].plannerDay,
       meal_type: req.body.meal_type !== undefined ? req.body.meal_type : db.meal_plan[idx].meal_type
     };
     writeDb(db);
@@ -529,9 +531,24 @@ async function main() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { index: false }));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      const indexPath = path.join(distPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        let html = fs.readFileSync(indexPath, "utf8");
+        const envScript = `
+  <script id="supabase-env-config">
+    window._env_ = {
+      NEXT_PUBLIC_SUPABASE_URL: ${JSON.stringify(process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || "")},
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${JSON.stringify(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "")}
+    };
+  </script>
+        `;
+        html = html.replace("</head>", `${envScript}\n</head>`);
+        res.send(html);
+      } else {
+        res.status(404).send("Index file not found");
+      }
     });
   }
 
