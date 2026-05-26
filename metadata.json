@@ -1,0 +1,6 @@
+{
+  "name": "Despensia",
+  "description": "Gestión inteligente de inventario de alimentos, recetas automáticas generadas por IA y planificador de menús semanales.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
