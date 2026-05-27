@@ -17,18 +17,23 @@ const runtimeDirname = typeof __dirname !== "undefined"
   : path.dirname(runtimeFilename);
 const dbPath = path.join(runtimeDirname, "db.json");
 
-// Inicializar el cliente del SDK de Google GenAI en el servidor
+// Función helper para obtener la instancia del cliente del SDK de Google GenAI
 // con la cabecera correspondiente requerida por AI Studio Build.
-// Usamos un placeholder seguro en caso de que la clave no esté configurada para evitar colapsar al iniciar el servidor.
-const rawApiKey = process.env.GEMINI_API_KEY || "";
-const ai = new GoogleGenAI({
-  apiKey: rawApiKey || "MISSING_GEMINI_API_KEY",
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
+// Se instancia de forma dinámica para asegurar que se obtengan las variables de entorno de Railway actualizadas.
+function getGenAIClient() {
+  const apiKey = process.env.GEMINI_API_KEY || "";
+  if (!apiKey || apiKey === "MISSING_GEMINI_API_KEY" || apiKey.trim() === "") {
+    throw new Error("Clave de API de Gemini no configurada. Configura la variable GEMINI_API_KEY en tu entorno o panel de Railway.");
+  }
+  return new GoogleGenAI({
+    apiKey: apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
     },
-  },
-});
+  });
+}
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -377,7 +382,7 @@ Devuelve la respuesta strictly en formato JSON con la siguiente estructura (no a
 Asegúrate de responder en español. No introduzcas marcas de código como \`\`\`json ni nada de eso. Devuelve directamente el objeto JSON válido.`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getGenAIClient().models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -439,7 +444,10 @@ Asegúrate de responder en español. No introduzcas marcas de código como \`\`\
     }
   } catch (err: any) {
     console.error("Error al llamar a Gemini API:", err);
-    res.status(500).json({ error: "Fallo al conectar con Gemini para formular la receta. Verifica que hayas configurado la clave de API." });
+    res.status(500).json({ 
+      error: "Fallo al conectar con Gemini para formular la receta. Verifica que hayas configurado la clave de API.",
+      details: err.message || err.toString()
+    });
   }
 });
 
@@ -485,7 +493,7 @@ Asegúrate de responder estrictamente en español.`
   };
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getGenAIClient().models.generateContent({
       model: MODEL_NAME,
       contents: { parts: [imagePart, textPart] },
       config: {
@@ -520,7 +528,10 @@ Asegúrate de responder estrictamente en español.`
     }
   } catch (err: any) {
     console.error("Error al procesar el ticket con Gemini:", err);
-    res.status(500).json({ error: "Error de análisis multimodal con Gemini API." });
+    res.status(500).json({ 
+      error: "Error de análisis multimodal con Gemini API.",
+      details: err.message || err.toString()
+    });
   }
 });
 
@@ -555,7 +566,7 @@ Devuelve la información estrictamente en formato JSON con la siguiente estructu
 Responde en español y asegúrate de retornar únicamente el objeto JSON válido.`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await getGenAIClient().models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -591,7 +602,10 @@ Responde en español y asegúrate de retornar únicamente el objeto JSON válido
     res.json(parsed);
   } catch (err: any) {
     console.error("Error al analizar receta importada:", err);
-    res.status(500).json({ error: "Error al interpretar la receta mediante IA." });
+    res.status(500).json({ 
+      error: "Error al interpretar la receta mediante IA.",
+      details: err.message || err.toString()
+    });
   }
 });
 
@@ -617,7 +631,7 @@ app.post("/api/gemini/generate-recipe-image", async (req, res) => {
   try {
     const prompt = `A studio-lit professional commercial food photography close up of ${recipeTitle}, beautiful colors, styled plate, highly appetizing, warm depth of field.`;
     
-    const response = await ai.models.generateContent({
+    const response = await getGenAIClient().models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [
@@ -660,6 +674,10 @@ app.post("/api/gemini/generate-recipe-image", async (req, res) => {
 // INTEGRACIÓN VITE CON EXPRESS: ENTORNO DEV & PRODUCCIÓN
 // ==========================================
 async function main() {
+  // Validación de clave de API al iniciar el servidor
+  const key = process.env.GEMINI_API_KEY || "";
+  console.log(`[Gemini Config] Clave cargada: ${key ? "SÍ" : "NO"} (Longitud: ${key.length}${key ? `, Prefijo: ${key.substring(0, 10)}...` : ""})`);
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

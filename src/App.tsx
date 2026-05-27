@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import {
   Carrot,
@@ -364,6 +364,53 @@ export default function App() {
   const [editingPantryId, setEditingPantryId] = useState<string | null>(null);
   const [pantryForm, setPantryForm] = useState({ name: "", theme: "emerald" });
 
+  // --- ESTADOS DE LA LISTA DE LA COMPRA ---
+  const [showShoppingList, setShowShoppingList] = useState(false);
+  const [selectedPantriesForList, setSelectedPantriesForList] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("despensia_shopping_pantries");
+      if (saved) return JSON.parse(saved);
+      const savedPantries = localStorage.getItem("despensia_pantries");
+      if (savedPantries) {
+        const parsed = JSON.parse(savedPantries);
+        return parsed.map((p: any) => p.id);
+      }
+      return ["default"];
+    } catch {
+      return ["default"];
+    }
+  });
+  const [customShoppingItems, setCustomShoppingItems] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("despensia_shopping_custom");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [newCustomShoppingItem, setNewCustomShoppingItem] = useState("");
+  const [shoppingCheckedItems, setShoppingCheckedItems] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("despensia_shopping_checked");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Auto-guardado de la lista en localStorage
+  useEffect(() => {
+    localStorage.setItem("despensia_shopping_pantries", JSON.stringify(selectedPantriesForList));
+  }, [selectedPantriesForList]);
+
+  useEffect(() => {
+    localStorage.setItem("despensia_shopping_custom", JSON.stringify(customShoppingItems));
+  }, [customShoppingItems]);
+
+  useEffect(() => {
+    localStorage.setItem("despensia_shopping_checked", JSON.stringify(shoppingCheckedItems));
+  }, [shoppingCheckedItems]);
+
   // --- ESTADOS DE AUTENTICACIÓN Y SINCRONIZACIÓN SUPABASE ---
   const [session, setSession] = useState<any>(null);
   const [isSyncingWithSupabase, setIsSyncingWithSupabase] = useState(false);
@@ -422,6 +469,170 @@ export default function App() {
   const activePantry = pantries.find(p => p.id === activePantryId) || pantries[0] || { id: "default", name: "Mi Despensa", theme: "emerald" };
   const activePantryTheme = activePantry.theme || "emerald";
 
+  // --- AUXILIRES DE LISTA DE LA COMPRA ---
+  const shoppingListItems = useMemo(() => {
+    // 1. Obtener alimentos con stock crítico o agotado de las despensas seleccionadas
+    const itemsFromPantries = inventory.filter(item => {
+      const { pantryId } = parseCategory(item.category);
+      if (!selectedPantriesForList.includes(pantryId)) return false;
+      
+      const qty = parseFloat(item.quantity) || 0;
+      const unit = (item.unit || "").toLowerCase();
+      
+      // Si la cantidad es 0 o menor, está agotado
+      if (qty <= 0) return true;
+      
+      // Stock crítico por unidades
+      if (unit === 'g' || unit === 'ml') {
+        return qty <= 150;
+      }
+      if (unit === 'kg' || unit === 'l' || unit === 'litros') {
+        return qty <= 0.15;
+      }
+      // Por defecto para unidades (uds) o cualquier otro
+      return qty <= 1;
+    }).map(item => {
+      const { category, pantryId } = parseCategory(item.category);
+      const pantryName = pantries.find(p => p.id === pantryId)?.name || "Despensa";
+      const pantryTheme = pantries.find(p => p.id === pantryId)?.theme || "emerald";
+      return {
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        category: category,
+        pantryId: pantryId,
+        pantryName: pantryName,
+        pantryTheme: pantryTheme,
+        isCustom: false
+      };
+    });
+
+    // 2. Agregar ítems personalizados
+    const customItems = customShoppingItems.map((name, idx) => ({
+      id: `custom_${idx}`,
+      name: name,
+      quantity: 0,
+      unit: "",
+      category: "Otros",
+      pantryId: "custom",
+      pantryName: "Personalizado",
+      pantryTheme: "slate",
+      isCustom: true
+    }));
+
+    return [...itemsFromPantries, ...customItems];
+  }, [inventory, selectedPantriesForList, customShoppingItems, pantries]);
+
+  const handleCopyShoppingList = () => {
+    if (shoppingListItems.length === 0) {
+      triggerAlert("info", "La lista de la compra está vacía.");
+      return;
+    }
+    const text = shoppingListItems
+      .map(item => {
+        const checkMark = shoppingCheckedItems.includes(item.id) ? "[x]" : "[ ]";
+        if (item.isCustom) {
+          return `${checkMark} ${item.name} (Manual)`;
+        }
+        return `${checkMark} ${item.name} (Stock actual: ${item.quantity} ${item.unit}) - Despensa: ${item.pantryName}`;
+      })
+      .join("\n");
+    
+    navigator.clipboard.writeText(text);
+    triggerAlert("success", "¡Lista de la compra copiada al portapapeles! 📋");
+  };
+
+  const handleCompletePurchase = async () => {
+    const checkedIds = shoppingCheckedItems;
+    if (checkedIds.length === 0) {
+      triggerAlert("info", "No has marcado ningún artículo en la lista de la compra.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const inventoryItemsToRestock = shoppingListItems.filter(item => !item.isCustom && checkedIds.includes(item.id));
+      const customItemsToRemove = shoppingListItems.filter(item => item.isCustom && checkedIds.includes(item.id)).map(item => item.name);
+
+      let restockedCount = 0;
+
+      for (const item of inventoryItemsToRestock) {
+        const origItem = inventory.find(it => it.id === item.id);
+        if (!origItem) continue;
+        
+        const restockQty = item.unit === "g" || item.unit === "ml" ? 500 : 6;
+        const newQty = origItem.quantity + restockQty;
+
+        if (session?.user) {
+          const { error } = await supabase
+            .from("inventory")
+            .update({ quantity: newQty, last_updated: new Date().toISOString() })
+            .eq("id", item.id)
+            .eq("user_id", session.user.id);
+          if (error) throw error;
+        } else {
+          await fetch(`/api/inventory/${item.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ quantity: newQty })
+          });
+        }
+        restockedCount++;
+      }
+
+      let newCustomItems = customShoppingItems;
+      if (customItemsToRemove.length > 0) {
+        newCustomItems = customShoppingItems.filter(name => !customItemsToRemove.includes(name));
+        setCustomShoppingItems(newCustomItems);
+      }
+
+      const newCheckedItems = shoppingCheckedItems.filter(id => !checkedIds.includes(id));
+      setShoppingCheckedItems(newCheckedItems);
+
+      await saveShoppingListMetadata(selectedPantriesForList, newCustomItems, newCheckedItems);
+
+      triggerAlert("success", `¡Compra completada con éxito! Se han repuesto ${restockedCount} productos en tu despensa y se han eliminado ${customItemsToRemove.length} artículos manuales.`);
+      fetchData();
+    } catch (err: any) {
+      console.error("Error al completar la compra:", err);
+      triggerAlert("error", "Error al completar la compra: " + (err.message || err.toString()));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRestockItem = async (itemId: string, restockQty: number) => {
+    const item = inventory.find(it => it.id === itemId);
+    if (!item) return;
+    const newQty = item.quantity + restockQty;
+
+    setLoading(true);
+    try {
+      if (session?.user) {
+        const { error } = await supabase
+          .from("inventory")
+          .update({ quantity: newQty, last_updated: new Date().toISOString() })
+          .eq("id", itemId)
+          .eq("user_id", session.user.id);
+        if (error) throw error;
+      } else {
+        await fetch(`/api/inventory/${itemId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ quantity: newQty })
+        });
+      }
+      triggerAlert("success", `¡${item.name} repuesto con éxito!`);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      triggerAlert("error", "Error al reponer alimento: " + (err.message || err.toString()));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getThemeHex = (themeName: string) => {
     const hexColors: Record<string, string> = {
       emerald: "#10b981",
@@ -433,9 +644,36 @@ export default function App() {
     return hexColors[themeName] || "#10b981";
   };
 
+  const saveShoppingListMetadata = async (pantriesList: string[], custom: string[], checked: string[]) => {
+    if (session?.user) {
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            shopping_pantries: pantriesList,
+            shopping_custom: custom,
+            shopping_checked: checked
+          }
+        });
+      } catch (err) {
+        console.error("Error updating shopping list metadata on Supabase:", err);
+      }
+    }
+  };
+
   const savePantries = async (newPantries: any[], newActiveId: string) => {
     setPantries(newPantries);
     setActivePantryId(newActiveId);
+
+    // Auto-select the newly added pantries in the shopping list
+    setSelectedPantriesForList(prev => {
+      const pantryIds = newPantries.map(p => p.id);
+      const prevChecked = prev.filter(id => pantryIds.includes(id));
+      const newlyAdded = pantryIds.filter(id => !prev.includes(id));
+      const updated = [...prevChecked, ...newlyAdded];
+      localStorage.setItem("despensia_shopping_pantries", JSON.stringify(updated));
+      saveShoppingListMetadata(updated, customShoppingItems, shoppingCheckedItems);
+      return updated;
+    });
 
     if (session?.user) {
       try {
@@ -533,6 +771,8 @@ export default function App() {
   const [chefSearchQuery, setChefSearchQuery] = useState("");
   const [showChefSearchDropdown, setShowChefSearchDropdown] = useState(false);
 
+  // (Estados y auto-guardado de Lista de la Compra se movieron al principio del componente)
+
   // --- IMPORTADOR DE RECETAS ---
   const [showRecipeImporter, setShowRecipeImporter] = useState(false);
   const [importingText, setImportingText] = useState("");
@@ -592,6 +832,17 @@ export default function App() {
         } else {
           setPantries([{ id: "default", name: "Mi Despensa", theme: "emerald" }]);
         }
+        if (metadata.shopping_pantries) {
+          setSelectedPantriesForList(metadata.shopping_pantries);
+        } else if (metadata.pantries) {
+          setSelectedPantriesForList(metadata.pantries.map((p: any) => p.id));
+        }
+        if (metadata.shopping_custom) {
+          setCustomShoppingItems(metadata.shopping_custom);
+        }
+        if (metadata.shopping_checked) {
+          setShoppingCheckedItems(metadata.shopping_checked);
+        }
         if (metadata.activePantryId) {
           setActivePantryId(metadata.activePantryId);
         } else {
@@ -627,6 +878,20 @@ export default function App() {
         }
       } else {
         setPantries([{ id: "default", name: "Mi Despensa", theme: "emerald" }]);
+      }
+      const localShoppingPantries = localStorage.getItem("despensia_shopping_pantries");
+      if (localShoppingPantries) {
+        try { setSelectedPantriesForList(JSON.parse(localShoppingPantries)); } catch (e) {}
+      } else if (localPantriesStr) {
+        try { setSelectedPantriesForList(JSON.parse(localPantriesStr).map((p: any) => p.id)); } catch (e) {}
+      }
+      const localShoppingCustom = localStorage.getItem("despensia_shopping_custom");
+      if (localShoppingCustom) {
+        try { setCustomShoppingItems(JSON.parse(localShoppingCustom)); } catch (e) {}
+      }
+      const localShoppingChecked = localStorage.getItem("despensia_shopping_checked");
+      if (localShoppingChecked) {
+        try { setShoppingCheckedItems(JSON.parse(localShoppingChecked)); } catch (e) {}
       }
       const localActivePantryId = localStorage.getItem("despensia_active_pantry");
       if (localActivePantryId) {
@@ -1032,8 +1297,11 @@ export default function App() {
           setTicketTips(`¡Analizado con éxito! Extrajimos ${parsedFoods.length} alimentos de tu ticket.`);
           triggerAlert("success", "Ticket escaneado correctamente. Revisa la lista propuesta.");
         } else {
-          const errData = await response.json();
-          triggerAlert("error", errData.error || "Fallo al analizar el ticket digital.");
+          const errData = await response.json().catch(() => ({}));
+          const detailedMsg = errData.error
+            ? `${errData.error}${errData.details ? ` (${errData.details})` : ""}`
+            : "Fallo al analizar el ticket digital.";
+          triggerAlert("error", detailedMsg);
           setTicketTips("Un error ocurrió en la IA. Inténtalo de nuevo o usa una carga simulada.");
         }
       } catch (err) {
@@ -1207,7 +1475,11 @@ export default function App() {
           triggerAlert("success", `Receta "${recipeResult.title}" redactada por Chef Gemini.`);
         }
       } else {
-        triggerAlert("error", "Error al formular la propuesta culinaria con Gemini.");
+        const errorData = await res.json().catch(() => ({}));
+        const detailedMsg = errorData.error
+          ? `${errorData.error}${errorData.details ? ` (${errorData.details})` : ""}`
+          : "Error al formular la propuesta culinaria con Gemini.";
+        triggerAlert("error", detailedMsg);
       }
     } catch (err) {
       triggerAlert("error", "Error de red conectando con Gemini.");
@@ -1363,7 +1635,10 @@ export default function App() {
         triggerAlert("success", `Receta "${imported.title}" interpretada con éxito.`);
       } else {
         const errData = await res.json().catch(() => ({}));
-        triggerAlert("error", errData.error || "No se pudo digerir la receta. Intenta con un texto más conciso.");
+        const detailedMsg = errData.error
+          ? `${errData.error}${errData.details ? ` (${errData.details})` : ""}`
+          : "No se pudo digerir la receta. Intenta con un texto más conciso.";
+        triggerAlert("error", detailedMsg);
       }
     } catch (err) {
       triggerAlert("error", "Conexión médica fallida.");
@@ -1386,6 +1661,12 @@ export default function App() {
         // Guardarla temporalmente/en el estado del componente
         setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, cover_url: data.imageUrl } : r));
         triggerAlert("success", `Cover personalizado generado para "${recipe.title}".`);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        const detailedMsg = errData.error
+          ? `${errData.error}${errData.details ? ` (${errData.details})` : ""}`
+          : "No se pudo procesar la ilustración de la comida.";
+        triggerAlert("error", detailedMsg);
       }
     } catch (err) {
       triggerAlert("error", "No se pudo procesar la ilustración de la comida.");
@@ -2481,6 +2762,203 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {/* WIDGET LISTA DE LA COMPRA INTELIGENTE */}
+            <div className="bg-white rounded-xl border border-slate-100 shadow-xs overflow-hidden">
+              <button
+                onClick={() => setShowShoppingList(!showShoppingList)}
+                className="w-full bg-slate-55 px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors border-b border-slate-100 cursor-pointer text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">🛒</span>
+                  <div>
+                    <h3 className="font-bold text-slate-800">Lista de la Compra Inteligente</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">Calcula automáticamente ingredientes faltantes o bajo stock</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {shoppingListItems.length > 0 && (
+                    <span className="text-xs bg-rose-100 text-rose-800 font-extrabold px-2.5 py-0.5 rounded-full">
+                      {shoppingListItems.length} faltantes
+                    </span>
+                  )}
+                  <span className="text-slate-400 text-xs font-bold uppercase tracking-wider">
+                    {showShoppingList ? "Ocultar" : "Mostrar"}
+                  </span>
+                </div>
+              </button>
+
+              {showShoppingList && (
+                <div className="p-6 space-y-6 animate-fade-in">
+                  
+                  {/* Selector de Despensas a incluir */}
+                  <div className="space-y-2">
+                    <label className="text-xs font-extrabold text-slate-500 uppercase tracking-wider block">Incluir despensas en la lista:</label>
+                    <div className="flex flex-wrap gap-2.5">
+                      {pantries.map(p => {
+                        const isChecked = selectedPantriesForList.includes(p.id);
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPantriesForList(prev => {
+                                const updated = isChecked ? prev.filter(id => id !== p.id) : [...prev, p.id];
+                                saveShoppingListMetadata(updated, customShoppingItems, shoppingCheckedItems);
+                                return updated;
+                              });
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-bold transition-all cursor-pointer ${
+                              isChecked 
+                                ? "bg-slate-800 text-slate-100 border-slate-800" 
+                                : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getThemeHex(p.theme) }} />
+                            {p.name}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Campo para añadir alimentos personalizados/manuales */}
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newCustomShoppingItem.trim()) return;
+                    if (!customShoppingItems.includes(newCustomShoppingItem.trim())) {
+                      const updated = [...customShoppingItems, newCustomShoppingItem.trim()];
+                      setCustomShoppingItems(updated);
+                      saveShoppingListMetadata(selectedPantriesForList, updated, shoppingCheckedItems);
+                    }
+                    setNewCustomShoppingItem("");
+                  }} className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Añadir artículo manual a la lista..."
+                      value={newCustomShoppingItem}
+                      onChange={(e) => setNewCustomShoppingItem(e.target.value)}
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-slate-300 focus:bg-white text-slate-800"
+                    />
+                    <button
+                      type="submit"
+                      className="bg-slate-850 hover:bg-slate-800 text-white font-extrabold text-xs px-4 py-2 rounded-xl transition-all cursor-pointer shadow-xs active:scale-95 flex-shrink-0"
+                    >
+                      Añadir
+                    </button>
+                  </form>
+
+                  {/* Listado de artículos a comprar */}
+                  {shoppingListItems.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 italic text-xs">
+                      🎉 ¡Todo al día! No quedan alimentos agotados o bajo stock en las despensas seleccionadas.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-xs font-bold text-slate-400 uppercase tracking-wider pb-1 border-b border-slate-100">
+                        <span>Artículo</span>
+                        <span>Acción</span>
+                      </div>
+                      
+                      <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto pr-1">
+                        {shoppingListItems.map(item => {
+                          const isChecked = shoppingCheckedItems.includes(item.id);
+                          return (
+                            <div key={item.id} className="py-3 flex items-center justify-between gap-4 text-xs">
+                              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    setShoppingCheckedItems(prev => 
+                                      isChecked ? prev.filter(id => id !== item.id) : [...prev, item.id]
+                                    );
+                                  }}
+                                  className="w-4 h-4 rounded text-slate-700 border-slate-300 accent-slate-700"
+                                />
+                                <span className={`font-semibold text-slate-850 ${isChecked ? "line-through text-slate-400" : ""}`}>
+                                  {item.name}
+                                </span>
+                                {!item.isCustom && (
+                                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+                                    Stock: {item.quantity} {item.unit}
+                                  </span>
+                                )}
+                                <span className="text-[9px] px-2 py-0.5 rounded-full border font-bold" style={{ borderColor: getThemeHex(item.pantryTheme) + '44', color: getThemeHex(item.pantryTheme) }}>
+                                  {item.pantryName}
+                                </span>
+                              </label>
+
+                              <div className="flex items-center gap-1.5">
+                                {item.isCustom ? (
+                                  <button
+                                    onClick={() => {
+                                      const updated = customShoppingItems.filter(name => name !== item.name);
+                                      setCustomShoppingItems(updated);
+                                      saveShoppingListMetadata(selectedPantriesForList, updated, shoppingCheckedItems.filter(id => id !== item.id));
+                                      setShoppingCheckedItems(prev => prev.filter(id => id !== item.id));
+                                    }}
+                                    className="text-rose-600 hover:underline font-bold text-[10px] px-2 py-1 hover:bg-rose-50 rounded"
+                                  >
+                                    Eliminar
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleRestockItem(item.id, item.unit === "g" || item.unit === "ml" ? 500 : 6)}
+                                    className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-extrabold text-[10px] px-2.5 py-1 rounded transition-colors"
+                                  >
+                                    Reponer {item.unit === "g" || item.unit === "ml" ? "+500g" : "+6 uds"}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Botones de acción general */}
+                      <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCustomShoppingItems([]);
+                            setShoppingCheckedItems([]);
+                            saveShoppingListMetadata(selectedPantriesForList, [], []);
+                            triggerAlert("info", "Lista de la compra reseteada.");
+                          }}
+                          className="text-slate-400 hover:text-slate-600 text-xs font-bold uppercase tracking-wider cursor-pointer"
+                        >
+                          Limpiar lista
+                        </button>
+
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCopyShoppingList}
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs py-2 px-4 rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1"
+                          >
+                            Copiar Lista 📋
+                          </button>
+                          
+                          {shoppingCheckedItems.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleCompletePurchase}
+                              className="text-white font-extrabold text-xs py-2 px-4 rounded-xl shadow-xs transition-all active:scale-95 cursor-pointer flex items-center gap-1 animate-fade-in"
+                              style={{ backgroundColor: getThemeHex(activePantryTheme) }}
+                            >
+                              Completar Compra ✅
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+
+                </div>
+              )}
+            </div>
 
             {/* BARRA DE ACCIÓN SUPERIOR: BÚSQUEDA Y NUEVOS PRODUCTOS */}
             <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-xs flex flex-col md:flex-row items-center gap-4 justify-between">
