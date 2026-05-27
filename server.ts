@@ -368,6 +368,10 @@ app.get("/api/gemini/test", async (req, res) => {
 // ==========================================
 app.post("/api/gemini/recipe", async (req, res) => {
   const { selectedIngredients, extraPrompt, allergies, preferences, cookingStyle, forceRegenerate } = req.body;
+  
+  console.log("[Gemini Recipe] Ingredientes recibidos:", JSON.stringify(selectedIngredients));
+  console.log("[Gemini Recipe] Preferencias:", { allergies, preferences, cookingStyle, forceRegenerate });
+
   if (!selectedIngredients || selectedIngredients.length === 0) {
     return res.status(400).json({ error: "No seleccionaste ningún ingrediente de tu despensa." });
   }
