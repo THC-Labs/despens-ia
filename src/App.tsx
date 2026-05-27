@@ -759,7 +759,7 @@ export default function App() {
     setSelectedForRecipe(list);
   };
 
-  const handleGenerateRecipeWithIA = async () => {
+  const handleGenerateRecipeWithIA = async (force: boolean = false) => {
     if (selectedForRecipe.length === 0) {
       triggerAlert("error", "Selecciona al menos un ingrediente de tu despensa para componer el prompt.");
       return;
@@ -782,14 +782,25 @@ export default function App() {
           extraPrompt: chefExtraPrompt,
           allergies: profilePrefs.allergies,
           preferences: profilePrefs.preferences,
-          cookingStyle: profilePrefs.cookingStyle
+          cookingStyle: profilePrefs.cookingStyle,
+          forceRegenerate: force
         })
       });
+
+      if (res.status === 429) {
+        const errorData = await res.json().catch(() => ({}));
+        triggerAlert("error", errorData.error || "Se ha excedido el límite de llamadas mensuales a Gemini.");
+        return;
+      }
 
       if (res.ok) {
         const recipeResult = await res.json();
         setGeneratedRecipeDraft(recipeResult);
-        triggerAlert("success", `Receta "${recipeResult.title}" redactada por Chef Gemini.`);
+        if (recipeResult._cached) {
+          triggerAlert("info", "Receta servida al instante desde la caché (sin consumir créditos).");
+        } else {
+          triggerAlert("success", `Receta "${recipeResult.title}" redactada por Chef Gemini.`);
+        }
       } else {
         triggerAlert("error", "Error al formular la propuesta culinaria con Gemini.");
       }
@@ -813,6 +824,7 @@ export default function App() {
             ingredients_required: generatedRecipeDraft.ingredients_required,
             instructions: generatedRecipeDraft.instructions,
             macros_summary: generatedRecipeDraft.macros_summary,
+            likes: 0,
             user_id: session.user.id,
             created_at: new Date().toISOString()
           });
@@ -850,6 +862,75 @@ export default function App() {
     }
   };
 
+  // Dar me gusta a una receta
+  const handleLikeRecipe = async (id: string) => {
+    try {
+      // Optimistic update en la interfaz
+      setRecipes(prev => prev.map(r => r.id === id ? { ...r, likes: (r.likes || 0) + 1 } : r));
+      
+      if (session?.user) {
+        // --- MODO CLOUD (SUPABASE) ---
+        const recipeToLike = recipes.find(r => r.id === id);
+        if (recipeToLike) {
+          const { error } = await supabase
+            .from("recipes")
+            .update({ likes: (recipeToLike.likes || 0) + 1 })
+            .eq("id", id);
+          if (error) {
+            console.warn("No se pudo persistir el like en Supabase (campo ausente en la tabla):", error);
+          }
+        }
+      } else {
+        // --- MODO SANDBOX LOCAL ---
+        const res = await fetch(`/api/recipes/${id}/like`, { method: "POST" });
+        if (res.ok) {
+          const data = await res.json();
+          setRecipes(prev => prev.map(r => r.id === id ? { ...r, likes: data.likes } : r));
+          triggerAlert("success", "¡Te gusta esta receta! ❤️");
+        }
+      }
+    } catch (err) {
+      console.error("Error al registrar el like:", err);
+    }
+  };
+
+  // Buscar recetas populares coincidentes (Popular Match)
+  const getPopularRecipeMatch = () => {
+    if (selectedForRecipe.length === 0 || recipes.length === 0) return null;
+    
+    let bestMatch: any = null;
+    let maxMatchPercentage = 0;
+    
+    for (const recipe of recipes) {
+      if (!recipe.ingredients_required || recipe.ingredients_required.length === 0) continue;
+      
+      let matchedCount = 0;
+      for (const ing of recipe.ingredients_required) {
+        const ingName = ing.name.trim().toLowerCase();
+        const isMatched = selectedForRecipe.some(sel => {
+          const selClean = sel.trim().toLowerCase();
+          return selClean.includes(ingName) || ingName.includes(selClean);
+        });
+        if (isMatched) {
+          matchedCount++;
+        }
+      }
+      
+      const totalIngs = recipe.ingredients_required.length;
+      const matchPercentage = matchedCount / totalIngs;
+      
+      // Coincidencia >= 75%
+      if (matchPercentage >= 0.75 && matchPercentage > maxMatchPercentage) {
+        maxMatchPercentage = matchPercentage;
+        bestMatch = recipe;
+      }
+    }
+    
+    return bestMatch ? { recipe: bestMatch, percentage: Math.round(maxMatchPercentage * 100) } : null;
+  };
+
+  const popularMatch = getPopularRecipeMatch();
+
   // Importar copiada o link
   const handleImportTextRecipe = async () => {
     if (!importingText.trim()) {
@@ -863,6 +944,13 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rawText: importingText })
       });
+
+      if (res.status === 429) {
+        const errorData = await res.json().catch(() => ({}));
+        triggerAlert("error", errorData.error || "Límite mensual excedido.");
+        return;
+      }
+
       if (res.ok) {
         const imported = await res.json();
         setGeneratedRecipeDraft(imported);
@@ -870,7 +958,8 @@ export default function App() {
         setImportingText("");
         triggerAlert("success", `Receta "${imported.title}" interpretada con éxito.`);
       } else {
-        triggerAlert("error", "No se pudo digerir la receta. Intenta con un texto más conciso.");
+        const errData = await res.json().catch(() => ({}));
+        triggerAlert("error", errData.error || "No se pudo digerir la receta. Intenta con un texto más conciso.");
       }
     } catch (err) {
       triggerAlert("error", "Conexión médica fallida.");
@@ -2430,6 +2519,40 @@ export default function App() {
                   />
                 </div>
 
+                {/* Sugerencia de Receta Popular si coincide con ingredientes */}
+                {popularMatch && (
+                  <div className="bg-white/10 border border-white/20 rounded-xl p-4 space-y-3 animate-fade-in">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 bg-emerald-500/25 rounded-lg text-emerald-300">
+                        <Sparkles className="w-4 h-4 animate-pulse" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-emerald-300 tracking-wider">¡Receta popular compatible!</h4>
+                        <p className="text-xs font-bold mt-0.5 text-white">
+                          Tienes ingredientes para elaborar tu receta guardada <strong>"{popularMatch.recipe.title}"</strong> (coincidencia del {popularMatch.percentage}%).
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setGeneratedRecipeDraft({
+                            title: popularMatch.recipe.title,
+                            ingredients_required: popularMatch.recipe.ingredients_required,
+                            instructions: popularMatch.recipe.instructions,
+                            macros_summary: popularMatch.recipe.macros_summary,
+                            _cached: true
+                          });
+                          triggerAlert("success", `Cargada propuesta popular "${popularMatch.recipe.title}" sin consumo de cuota.`);
+                        }}
+                        className="bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold text-[10px] uppercase px-3.5 py-2 rounded-lg transition-all active:scale-95 cursor-pointer shadow-sm"
+                      >
+                        Cargar Receta Guardada (0 tokens)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Acción de procesar */}
                 <div className="flex flex-wrap gap-4 items-center">
                   <button
@@ -2502,7 +2625,13 @@ export default function App() {
               <div className="bg-amber-50/50 rounded-2xl border-2 border-amber-300 p-6 space-y-5 animate-fade-in">
                 <div className="flex items-center justify-between border-b border-amber-200 pb-3 flex-wrap gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="bg-amber-100 text-amber-800 font-bold text-[10px] uppercase px-2.5 py-1 rounded-md tracking-wider">Revisión Culinaria IA</span>
+                    {generatedRecipeDraft._cached ? (
+                      <span className="bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase px-2.5 py-1 rounded-md tracking-wider flex items-center gap-1">
+                        ⚡ Caché Instantánea
+                      </span>
+                    ) : (
+                      <span className="bg-amber-100 text-amber-800 font-bold text-[10px] uppercase px-2.5 py-1 rounded-md tracking-wider">Revisión Culinaria IA</span>
+                    )}
                     <h3 className="text-xl font-bold text-slate-800">{generatedRecipeDraft.title}</h3>
                   </div>
                   <div className="flex items-center gap-1 bg-amber-100 text-amber-900 px-3 py-1 rounded-lg text-xs font-mono font-bold">
@@ -2537,7 +2666,15 @@ export default function App() {
 
                 </div>
 
-                <div className="flex justify-end gap-3 border-t border-amber-200 pt-4">
+                <div className="flex justify-end gap-3 border-t border-amber-200 pt-4 flex-wrap">
+                  {generatedRecipeDraft._cached && (
+                    <button
+                      onClick={() => handleGenerateRecipeWithIA(true)}
+                      className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1 shadow-3xs active:scale-95 transition-all cursor-pointer mr-auto"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> Forzar Nueva Generación IA
+                    </button>
+                  )}
                   <button
                     onClick={() => setGeneratedRecipeDraft(null)}
                     className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-4 py-2 rounded-lg text-xs"
@@ -2653,13 +2790,23 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Botón de Lanzamiento de Modo Cocinar Live */}
-                          <button
-                            onClick={() => startLiveCookingMode(recipe)}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all active:scale-98 cursor-pointer"
-                          >
-                            <Play className="w-3.5 h-3.5" /> Iniciar Cocina Live 👨‍🍳
-                          </button>
+                          {/* Botón de Lanzamiento de Modo Cocinar Live y Me Gusta */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => startLiveCookingMode(recipe)}
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-xs transition-all active:scale-98 cursor-pointer"
+                            >
+                              <Play className="w-3.5 h-3.5" /> Iniciar Cocina Live 👨‍🍳
+                            </button>
+                            <button
+                              onClick={() => handleLikeRecipe(recipe.id)}
+                              className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 font-extrabold text-xs px-3 rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                              title="Dar me gusta"
+                            >
+                              <span>❤️</span>
+                              <span className="font-mono text-[10px]">{recipe.likes || 0}</span>
+                            </button>
+                          </div>
                         </div>
 
                       </div>
