@@ -1456,7 +1456,7 @@ export default function App() {
           allergies: profilePrefs.allergies,
           preferences: profilePrefs.preferences,
           cookingStyle: profilePrefs.cookingStyle,
-          forceRegenerate: force
+          forceRegenerate: force === true
         })
       });
 
@@ -3582,7 +3582,7 @@ export default function App() {
                   <button
                     id="submit-ai-recipe"
                     disabled={generatingRecipe}
-                    onClick={handleGenerateRecipeWithIA}
+                    onClick={() => handleGenerateRecipeWithIA(false)}
                     className="bg-white text-emerald-800 disabled:bg-emerald-200 font-bold px-6 py-3 rounded-xl text-sm shadow-md flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
                   >
                     {generatingRecipe ? (
