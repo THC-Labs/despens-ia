@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import {
-  Carrot,
+  CookingPot,
   Plus,
   Trash2,
   Edit2,
@@ -63,6 +63,85 @@ const STANDARD_DAYS = [
 ];
 
 const MEAL_TYPES = ["Desayuno", "Comida", "Cena", "Snack"];
+
+interface MacroGoals {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface Macros {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+// Parsea macros desde strings (ej. "380 kcal | P: 32g | C: 12g | G: 18g")
+function parseMacros(summary: string | null | undefined): Macros {
+  const macros = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+  if (!summary) return macros;
+
+  // Calorías
+  const calMatch = summary.match(/(\d+(?:\.\d+)?)\s*k?cal/i);
+  if (calMatch) macros.calories = Math.round(parseFloat(calMatch[1]));
+
+  // Proteínas
+  const protMatch1 = summary.match(/(?:p|proteinas?|protein|prot)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
+  const protMatch2 = summary.match(/(\d+(?:\.\d+)?)\s*g\s*(?:p|proteinas?|protein|prot)/i);
+  if (protMatch1) macros.protein = Math.round(parseFloat(protMatch1[1]));
+  else if (protMatch2) macros.protein = Math.round(parseFloat(protMatch2[1]));
+
+  // Carbohidratos
+  const carbMatch1 = summary.match(/(?:c|carbohidratos?|carbos?|carbo|carbs?)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
+  const carbMatch2 = summary.match(/(\d+(?:\.\d+)?)\s*g\s*(?:c|carbohidratos?|carbos?|carbo|carbs?)/i);
+  if (carbMatch1) macros.carbs = Math.round(parseFloat(carbMatch1[1]));
+  else if (carbMatch2) macros.carbs = Math.round(parseFloat(carbMatch2[1]));
+
+  // Grasas
+  const fatMatch1 = summary.match(/(?:g|grasas?|grasa|f|fats?)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
+  const fatMatch2 = summary.match(/(\d+(?:\.\d+)?)\s*g\s*(?:g|grasas?|grasa|f|fats?)/i);
+  if (fatMatch1) macros.fat = Math.round(parseFloat(fatMatch1[1]));
+  else if (fatMatch2) macros.fat = Math.round(parseFloat(fatMatch2[1]));
+
+  return macros;
+}
+
+// Formatea fecha a YYYY-MM-DD en hora local
+function formatLocalDate(date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+// Devuelve los 7 objetos Date de la semana que contiene a la fecha dada (Lunes a Domingo)
+function getWeekDates(date: Date): Date[] {
+  const dates: Date[] = [];
+  const current = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = current.getDay();
+  const diff = current.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(current.setDate(diff));
+  
+  for (let i = 0; i < 7; i++) {
+    const next = new Date(monday);
+    next.setDate(monday.getDate() + i);
+    dates.push(next);
+  }
+  return dates;
+}
+
+const MONTH_NAMES_ES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const DAY_NAMES_ES = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+function getWeekDayNameEs(date: Date): string {
+  return DAY_NAMES_ES[(date.getDay() + 6) % 7];
+}
+
+function formatDateLabel(date: Date): string {
+  return `${date.getDate()} ${MONTH_NAMES_ES[date.getMonth()]}`;
+}
 
 // Tickets de ejemplo codificados en Base64 de forma abreviada para simulación y pruebas directas
 const SAMPLE_TICKET_MERCADONA = {
@@ -858,6 +937,51 @@ export default function App() {
   const [selectedPlannerDay, setSelectedPlannerDay] = useState("Lunes");
   const [selectedPlannerMeal, setSelectedPlannerMeal] = useState("Comida");
   const [selectedRecipeForPlan, setSelectedRecipeForPlan] = useState("");
+  
+  // Soporte para todo el año, macros y objetivos
+  const [selectedPlannerDate, setSelectedPlannerDate] = useState(() => formatLocalDate(new Date()));
+  const [currentWeekDate, setCurrentWeekDate] = useState(() => new Date());
+  const [showGoalsEditor, setShowGoalsEditor] = useState(false);
+  
+  const [macroGoals, setMacroGoals] = useState<MacroGoals>(() => {
+    try {
+      const saved = localStorage.getItem("despensia_macro_goals");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error("Error al cargar objetivos de macros del localStorage", e);
+    }
+    return { calories: 2000, protein: 130, carbs: 220, fat: 70 };
+  });
+
+  useEffect(() => {
+    localStorage.setItem("despensia_macro_goals", JSON.stringify(macroGoals));
+  }, [macroGoals]);
+
+  const weekDates = useMemo(() => {
+    return getWeekDates(currentWeekDate);
+  }, [currentWeekDate]);
+
+  // Totales de macros por día en la semana actual
+  const weekMacrosTotals = useMemo(() => {
+    const totals: Record<string, Macros> = {};
+    weekDates.forEach(date => {
+      const dateStr = formatLocalDate(date);
+      totals[dateStr] = { calories: 0, protein: 0, carbs: 0, fat: 0 };
+      
+      const dayMeals = mealPlan.filter((p: any) => p.date === dateStr);
+      dayMeals.forEach((planned: any) => {
+        const recipe = recipes.find(r => r.id === planned.recipe_id);
+        if (recipe && recipe.macros_summary) {
+          const macros = parseMacros(recipe.macros_summary);
+          totals[dateStr].calories += macros.calories;
+          totals[dateStr].protein += macros.protein;
+          totals[dateStr].carbs += macros.carbs;
+          totals[dateStr].fat += macros.fat;
+        }
+      });
+    });
+    return totals;
+  }, [weekDates, mealPlan, recipes]);
 
   // ==========================================
   // EFECTOS E INICIALIZACIÓN
@@ -2104,14 +2228,18 @@ export default function App() {
       return;
     }
 
+    const [year, month, day] = selectedPlannerDate.split("-").map(Number);
+    const dateObj = new Date(year, month - 1, day);
+    const computedDayName = getWeekDayNameEs(dateObj);
+
     try {
       if (session?.user) {
         // --- MODO CLOUD (SUPABASE) ---
         const { data, error } = await supabase
           .from("meal_plan")
           .insert({
-            date: `2026-05-25`,
-            plannerDay: selectedPlannerDay,
+            date: selectedPlannerDate,
+            plannerDay: computedDayName,
             meal_type: selectedPlannerMeal,
             recipe_id: selectedRecipeForPlan,
             status: "planned",
@@ -2124,7 +2252,7 @@ export default function App() {
         const savedItem = data?.[0];
         if (savedItem) {
           setMealPlan(prev => [...prev, savedItem]);
-          triggerAlert("success", `"${recipes.find(r => r.id === selectedRecipeForPlan)?.title}" planificado para el ${selectedPlannerDay} en la ${selectedPlannerMeal} en la nube.`);
+          triggerAlert("success", `"${recipes.find(r => r.id === selectedRecipeForPlan)?.title}" planificado para el ${computedDayName} (${selectedPlannerDate}) en la ${selectedPlannerMeal} en la nube.`);
           setSelectedRecipeForPlan("");
         }
       } else {
@@ -2133,7 +2261,8 @@ export default function App() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            date: `2026-05-25`,
+            date: selectedPlannerDate,
+            plannerDay: computedDayName,
             meal_type: selectedPlannerMeal,
             recipe_id: selectedRecipeForPlan,
             status: "planned"
@@ -2142,9 +2271,9 @@ export default function App() {
 
         if (res.ok) {
           const savedItem = await res.json();
-          const updatedWithDay = { ...savedItem, plannerDay: selectedPlannerDay };
+          const updatedWithDay = { ...savedItem, plannerDay: computedDayName };
           setMealPlan(prev => [...prev, updatedWithDay]);
-          triggerAlert("success", `"${recipes.find(r => r.id === selectedRecipeForPlan)?.title}" planificado para el ${selectedPlannerDay} en la ${selectedPlannerMeal}.`);
+          triggerAlert("success", `"${recipes.find(r => r.id === selectedRecipeForPlan)?.title}" planificado para el ${computedDayName} (${selectedPlannerDate}) en la ${selectedPlannerMeal}.`);
           setSelectedRecipeForPlan("");
         }
       }
@@ -2300,7 +2429,7 @@ export default function App() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-900/30">
-                <Carrot className="w-5 h-5 animate-pulse" />
+                <CookingPot className="w-5 h-5 animate-pulse" />
               </div>
               <span className="text-xl font-black tracking-tight text-white">Despensia</span>
             </div>
@@ -2675,7 +2804,7 @@ export default function App() {
         <footer className="border-t border-slate-800 bg-slate-950 py-12 text-center text-xs text-slate-500 font-mono">
           <div className="max-w-7xl mx-auto px-4 space-y-4">
             <div className="flex justify-center items-center gap-2">
-              <Carrot className="w-4 h-4 text-emerald-500 animate-bounce" />
+              <CookingPot className="w-4 h-4 text-emerald-500 animate-bounce" />
               <span className="font-sans font-black text-slate-300">Despensia</span>
             </div>
             <p>Despensia App 🍓 — AI Studio Build 2026. Todos los derechos reservados.</p>
@@ -2700,7 +2829,7 @@ export default function App() {
           
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-emerald-600 rounded-xl text-white shadow-md shadow-emerald-200">
-              <Carrot className="w-6 h-6 animate-bounce" />
+              <CookingPot className="w-6 h-6 animate-bounce" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -2822,7 +2951,7 @@ export default function App() {
                 : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"
             }`}
           >
-            <Carrot className="w-4 h-4" />
+            <CookingPot className="w-4 h-4" />
             Gastronomía (Despensa)
           </button>
           
@@ -3528,7 +3657,7 @@ export default function App() {
 
               {activeInventory.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 space-y-3">
-                  <Carrot className="w-12 h-12 text-slate-300 mx-auto" />
+                  <CookingPot className="w-12 h-12 text-slate-300 mx-auto" />
                   <p className="font-medium">No hay ingredientes registrados en tu despensa todavía.</p>
                   <p className="text-xs max-w-sm mx-auto">Prueba escaneando un ticket o agregándolos de forma rápida para empezar a formular tus menús.</p>
                 </div>
@@ -4441,34 +4570,169 @@ export default function App() {
         {activeTab === "planner" && (
           <div id="panel-planner" className="space-y-8 animate-fade-in">
             
-            {/* AGENDAR MENÚ INTUICIÓN */}
+            {/* CABECERA Y NAVEGACIÓN DE FECHAS */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-500/10 text-amber-600 rounded-xl">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 tracking-tight">Planificador de Menús Anual</h3>
+                  <p className="text-xs text-slate-400">
+                    Semana del <span className="font-bold text-slate-600">{formatDateLabel(weekDates[0])}</span> al <span className="font-bold text-slate-600">{formatDateLabel(weekDates[6])}</span> ({weekDates[0].getFullYear()})
+                  </p>
+                </div>
+              </div>
+
+              {/* Controles de Navegación */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prev = new Date(currentWeekDate);
+                    prev.setDate(currentWeekDate.getDate() - 7);
+                    setCurrentWeekDate(prev);
+                  }}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50 text-slate-700 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
+                  title="Semana anterior"
+                >
+                  ◀
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentWeekDate(new Date())}
+                  className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-extrabold bg-white text-slate-700 hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+                >
+                  Hoy 📅
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = new Date(currentWeekDate);
+                    next.setDate(currentWeekDate.getDate() + 7);
+                    setCurrentWeekDate(next);
+                  }}
+                  className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50 text-slate-700 hover:bg-slate-100 active:scale-95 transition-all cursor-pointer"
+                  title="Semana siguiente"
+                >
+                  ▶
+                </button>
+
+                <div className="relative flex items-center">
+                  <input
+                    type="date"
+                    value={formatLocalDate(currentWeekDate)}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const [y, m, d] = e.target.value.split("-").map(Number);
+                        setCurrentWeekDate(new Date(y, m - 1, d));
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold bg-slate-50 text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowGoalsEditor(!showGoalsEditor)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all duration-250 flex items-center gap-1 active:scale-95 border cursor-pointer ${
+                    showGoalsEditor 
+                      ? "bg-amber-600 border-amber-600 text-white shadow-sm" 
+                      : "bg-slate-900 border-slate-900 text-white hover:bg-slate-800"
+                  }`}
+                >
+                  ⚙️ Objetivos
+                </button>
+              </div>
+            </div>
+
+            {/* EDITOR AVANZADO DE OBJETIVOS (COLAPSABLE) */}
+            {showGoalsEditor && (
+              <div className="bg-amber-50/20 p-6 rounded-2xl border border-amber-100/70 shadow-xs space-y-4 animate-fade-in">
+                <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                  <h4 className="text-sm font-extrabold text-amber-900 flex items-center gap-2">
+                    🎯 Configuración Avanzada: Objetivos Nutricionales Diarios
+                  </h4>
+                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-md">
+                    Autoguardado Local
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">Calorías Diarias (kcal)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={macroGoals.calories || ""}
+                      onChange={(e) => setMacroGoals(prev => ({ ...prev, calories: Math.max(0, parseInt(e.target.value) || 0) }))}
+                      className="w-full bg-white p-2.5 border border-amber-200 rounded-lg text-sm font-extrabold text-slate-800 focus:outline-amber-500 shadow-3xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">Proteínas (g)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={macroGoals.protein || ""}
+                      onChange={(e) => setMacroGoals(prev => ({ ...prev, protein: Math.max(0, parseInt(e.target.value) || 0) }))}
+                      className="w-full bg-white p-2.5 border border-amber-200 rounded-lg text-sm font-extrabold text-slate-800 focus:outline-amber-500 shadow-3xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">Carbohidratos (g)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={macroGoals.carbs || ""}
+                      onChange={(e) => setMacroGoals(prev => ({ ...prev, carbs: Math.max(0, parseInt(e.target.value) || 0) }))}
+                      className="w-full bg-white p-2.5 border border-amber-200 rounded-lg text-sm font-extrabold text-slate-800 focus:outline-amber-500 shadow-3xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">Grasas (g)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={macroGoals.fat || ""}
+                      onChange={(e) => setMacroGoals(prev => ({ ...prev, fat: Math.max(0, parseInt(e.target.value) || 0) }))}
+                      className="w-full bg-white p-2.5 border border-amber-200 rounded-lg text-sm font-extrabold text-slate-800 focus:outline-amber-500 shadow-3xs"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-amber-700 italic">
+                  💡 Tip: Estos valores definirán las barras de progreso individuales que verás en la parte inferior de cada día en el planificador semanal.
+                </p>
+              </div>
+            )}
+
+            {/* FORMULARIO DE AGENDADO */}
             <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-xs space-y-5">
               <div className="border-b border-slate-100 pb-2">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-emerald-600" />
-                  Programar Menús Semanales
-                </h3>
-                <p className="text-xs text-slate-400">Escoge un día de la semana, el tipo de plato y vincula una de tus recetas para balancear tus calorías y automatizar la cocina.</p>
+                <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                  ➕ Programar Plato en Calendario
+                </h4>
+                <p className="text-xs text-slate-400">Escoge la fecha de agendado, el tipo de comida y vincula una de tus recetas guardadas.</p>
               </div>
 
               {recipes.length === 0 ? (
                 <div className="bg-rose-50 text-rose-800 py-3.5 px-4 rounded-xl text-xs border border-rose-100 font-semibold">
-                  ⚠️ Necesitas registrar al menos una receta en tu catálogo antes de poder programar el planificador semanal.
+                  ⚠️ Necesitas registrar al menos una receta en tu catálogo antes de poder programar.
                 </div>
               ) : (
                 <form onSubmit={handleAddToPlan} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
                   
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Día de la semana</label>
-                    <select
-                      value={selectedPlannerDay}
-                      onChange={(e) => setSelectedPlannerDay(e.target.value)}
-                      className="w-full bg-slate-50/70 p-2.5 border border-slate-200 rounded-lg text-sm focus:outline-emerald-500 cursor-pointer"
-                    >
-                      {STANDARD_DAYS.map(day => (
-                        <option key={day} value={day}>{day}</option>
-                      ))}
-                    </select>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fecha de agendado</label>
+                    <input
+                      type="date"
+                      required
+                      value={selectedPlannerDate}
+                      onChange={(e) => setSelectedPlannerDate(e.target.value)}
+                      className="w-full bg-slate-50/70 p-2.5 border border-slate-200 rounded-lg text-sm focus:outline-emerald-500 cursor-pointer font-bold"
+                    />
                   </div>
 
                   <div>
@@ -4514,28 +4778,67 @@ export default function App() {
 
             {/* CUADRICULA SEMANAL DE MENÚS */}
             <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
-              {STANDARD_DAYS.map(day => {
-                const dayMeals = getDayMeals(day);
+              {weekDates.map(dateObj => {
+                const dateStr = formatLocalDate(dateObj);
+                const dayMeals = mealPlan.filter((p: any) => p.date === dateStr);
+                const dayName = getWeekDayNameEs(dateObj);
+                const dateLabel = formatDateLabel(dateObj);
                 
+                const dayMacros = weekMacrosTotals[dateStr] || { calories: 0, protein: 0, carbs: 0, fat: 0 };
+                
+                const calPercent = Math.min(100, macroGoals.calories > 0 ? (dayMacros.calories / macroGoals.calories) * 100 : 0);
+                const protPercent = Math.min(100, macroGoals.protein > 0 ? (dayMacros.protein / macroGoals.protein) * 100 : 0);
+                const carbPercent = Math.min(100, macroGoals.carbs > 0 ? (dayMacros.carbs / macroGoals.carbs) * 100 : 0);
+                const fatPercent = Math.min(100, macroGoals.fat > 0 ? (dayMacros.fat / macroGoals.fat) * 100 : 0);
+
+                const isToday = formatLocalDate(new Date()) === dateStr;
+
                 return (
-                  <div key={day} className="bg-white rounded-xl border border-slate-100 shadow-3xs overflow-hidden flex flex-col h-full min-h-[300px]">
-                    
+                  <div 
+                    key={dateStr} 
+                    className={`rounded-2xl border transition-all flex flex-col h-full min-h-[380px] overflow-hidden ${
+                      isToday 
+                        ? "bg-amber-50/20 border-amber-300 shadow-md ring-1 ring-amber-300/20" 
+                        : "bg-white border-slate-100 shadow-3xs hover:border-slate-200"
+                    }`}
+                  >
                     {/* Header Día */}
-                    <div className="bg-slate-100/70 px-4 py-2 text-center border-b border-slate-100 flex items-center justify-between">
-                      <span className="font-extrabold text-xs text-slate-700 block text-center flex-1">{day}</span>
-                      {dayMeals.length > 0 && (
-                        <span className="bg-slate-200 text-slate-600 rounded-full w-4.5 h-4.5 text-[9px] font-bold flex items-center justify-center font-mono">
-                          {dayMeals.length}
-                        </span>
-                      )}
+                    <div className={`px-3 py-2 text-center border-b flex items-center justify-between ${
+                      isToday ? "bg-amber-500/10 border-amber-100 text-amber-900" : "bg-slate-100/50 border-slate-100 text-slate-700"
+                    }`}>
+                      <div className="text-left">
+                        <span className="font-extrabold text-xs block leading-tight">{dayName}</span>
+                        <span className="text-[9px] text-slate-400 font-bold block">{dateLabel}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {dayMeals.length > 0 && (
+                          <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black font-mono ${
+                            isToday ? "bg-amber-600 text-white" : "bg-slate-200 text-slate-600"
+                          }`}>
+                            {dayMeals.length}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedPlannerDate(dateStr);
+                            triggerAlert("info", `Fecha cambiada a ${dayName} (${dateStr}). Usa el panel superior para agendar.`);
+                            document.getElementById("panel-planner")?.scrollIntoView({ behavior: "smooth" });
+                          }}
+                          className="p-1 rounded-md text-slate-400 hover:text-amber-600 hover:bg-slate-100 transition-colors cursor-pointer"
+                          title="Programar plato para este día"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Menús listados del día */}
-                    <div className="p-3 flex-1 space-y-3 divide-y divide-slate-100/50">
+                    <div className="p-3 flex-1 space-y-3 overflow-y-auto max-h-[250px] divide-y divide-slate-100/60">
                       {dayMeals.length === 0 ? (
-                        <p className="text-[10px] text-slate-400 py-12 text-center italic">Vacío</p>
+                        <p className="text-[10px] text-slate-400 py-16 text-center italic">Vacío</p>
                       ) : (
-                        dayMeals.map((planned, index) => {
+                        dayMeals.map((planned: any) => {
                           const recipe = recipes.find(r => r.id === planned.recipe_id);
                           const isConsumed = planned.status === "consumed";
 
@@ -4543,37 +4846,41 @@ export default function App() {
                             <div key={planned.id} className="pt-2 text-left space-y-1.5 first:pt-0">
                               
                               <div className="flex items-center justify-between">
-                                <span className="bg-emerald-100 text-emerald-800 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md">
+                                <span className="bg-emerald-50 text-emerald-800 text-[8px] font-mono font-black px-1.5 py-0.5 rounded-md border border-emerald-100/50 uppercase">
                                   {planned.meal_type}
                                 </span>
                                 
                                 <button
                                   onClick={() => handleRemoveFromPlan(planned.id)}
-                                  className="text-rose-400 hover:text-rose-600 p-0.5 rounded"
+                                  className="text-rose-450 hover:text-rose-600 p-0.5 rounded font-bold text-xs cursor-pointer"
                                   title="Quitar de planificación"
                                 >
                                   ×
                                 </button>
                               </div>
 
-                              <h5 className="text-xs font-extrabold text-slate-800 leading-snug">{recipe?.title || "Receta no disponible"}</h5>
+                              <h5 className="text-[11px] font-black text-slate-800 leading-snug">{recipe?.title || "Receta no disponible"}</h5>
                               
                               {recipe && (
-                                <div className="space-y-1">
-                                  <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">{recipe.macros_summary}</p>
+                                <div className="space-y-1.5">
+                                  {recipe.macros_summary && (
+                                    <p className="text-[7.5px] text-slate-400 font-extrabold uppercase tracking-wider leading-none">
+                                      {recipe.macros_summary}
+                                    </p>
+                                  )}
                                   
                                   {isConsumed ? (
-                                    <span className="bg-slate-100 text-slate-500 text-[9px] font-semibold px-2 py-0.5 rounded-md flex items-center justify-center gap-1 border border-slate-100">
+                                    <span className="bg-slate-105 text-slate-400 text-[9px] font-semibold py-1 rounded-lg flex items-center justify-center gap-0.5 border border-slate-150">
                                       ✓ Consumido
                                     </span>
                                   ) : (
                                     <button
                                       onClick={() => startLiveCookingMode(recipe, planned)}
                                       disabled={loading}
-                                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[10px] py-1.5 rounded-lg border border-emerald-500 shadow-3xs flex items-center justify-center gap-1 active:scale-95 transition-all text-center uppercase tracking-wider block cursor-pointer"
+                                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[9px] py-1 rounded-lg border border-emerald-500 shadow-3xs flex items-center justify-center gap-0.5 active:scale-95 transition-all text-center uppercase tracking-wider block cursor-pointer"
                                       title="Iniciar preparación guiada y controlar merma de stock en vivo"
                                     >
-                                      🍳 Cocinar en Vivo
+                                      🍳 Cocinar
                                     </button>
                                   )}
                                 </div>
@@ -4584,6 +4891,62 @@ export default function App() {
                         })
                       )}
                     </div>
+
+                    {/* Footer Macros */}
+                    {dayMeals.length > 0 && (
+                      <div className="bg-slate-50/80 p-2.5 border-t border-slate-100 space-y-1.5 text-[9px] font-bold mt-auto">
+                        <div className="space-y-0.5">
+                          <div className="flex justify-between text-slate-700">
+                            <span>Calorías:</span>
+                            <span className="font-extrabold">{dayMacros.calories} / {macroGoals.calories} kcal</span>
+                          </div>
+                          <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className={`h-full transition-all duration-300 ${
+                                dayMacros.calories > macroGoals.calories 
+                                  ? "bg-rose-500 animate-pulse" 
+                                  : calPercent > 90 
+                                  ? "bg-amber-600" 
+                                  : "bg-emerald-600"
+                              }`}
+                              style={{ width: `${calPercent}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-1 pt-1 border-t border-slate-100/50 text-[8px] text-slate-500 leading-none">
+                          <div className="space-y-0.5">
+                            <div className="flex justify-between">
+                              <span>P:</span>
+                              <span className="font-extrabold text-slate-700">{dayMacros.protein}/{macroGoals.protein}g</span>
+                            </div>
+                            <div className="w-full bg-slate-250 rounded-full h-1">
+                              <div className="bg-amber-500 h-full" style={{ width: `${protPercent}%` }} />
+                            </div>
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <div className="flex justify-between">
+                              <span>C:</span>
+                              <span className="font-extrabold text-slate-700">{dayMacros.carbs}/{macroGoals.carbs}g</span>
+                            </div>
+                            <div className="w-full bg-slate-250 rounded-full h-1">
+                              <div className="bg-orange-400 h-full" style={{ width: `${carbPercent}%` }} />
+                            </div>
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <div className="flex justify-between">
+                              <span>G:</span>
+                              <span className="font-extrabold text-slate-700">{dayMacros.fat}/{macroGoals.fat}g</span>
+                            </div>
+                            <div className="w-full bg-slate-250 rounded-full h-1">
+                              <div className="bg-yellow-600 h-full" style={{ width: `${fatPercent}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                   </div>
                 );

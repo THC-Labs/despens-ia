@@ -7,6 +7,31 @@
   --animate-float-slow: float 6s ease-in-out infinite;
   --animate-pulse-glow: pulse-glow 3s ease-in-out infinite;
 
+  /* Rediseño de colores esmeralda a paleta Horno (Cobre/Ámbar Tostado) */
+  --color-emerald-50: #fffaf0;
+  --color-emerald-100: #ffecd1;
+  --color-emerald-200: #ffd4a3;
+  --color-emerald-300: #ffb770;
+  --color-emerald-400: #f98426;
+  --color-emerald-500: #e0620d;
+  --color-emerald-600: #c24b00;
+  --color-emerald-700: #993700;
+  --color-emerald-800: #702500;
+  --color-emerald-900: #4a1500;
+  --color-emerald-950: #290800;
+
+  /* Rediseño de colores teal a paleta Horno Tostado */
+  --color-teal-50: #fffbf5;
+  --color-teal-100: #fdf0dd;
+  --color-teal-200: #fbd6a3;
+  --color-teal-300: #f7b461;
+  --color-teal-400: #f48b17;
+  --color-teal-500: #d66b0d;
+  --color-teal-600: #b05103;
+  --color-teal-700: #8a3b00;
+  --color-teal-800: #662700;
+  --color-teal-900: #421600;
+
   @keyframes scanline {
     0% { top: 0%; opacity: 0; }
     10% { opacity: 1; }
@@ -21,4 +46,27 @@
     0%, 100% { opacity: 0.15; transform: scale(0.95); }
     50% { opacity: 0.4; transform: scale(1.05); }
   }
+}
+
+/* Clases utilitarias premium para vidrio y sombras */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(254, 215, 170, 0.35);
+}
+
+.dark-glass-panel {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(234, 88, 12, 0.15);
+}
+
+.glow-amber {
+  box-shadow: 0 0 20px rgba(234, 88, 12, 0.12);
+}
+
+.glow-amber-strong {
+  box-shadow: 0 0 30px rgba(234, 88, 12, 0.25);
 }
