@@ -316,6 +316,53 @@ app.delete("/api/meal-plan/:id", (req, res) => {
 });
 
 
+app.get("/api/gemini/test", async (req, res) => {
+  const key = process.env.GEMINI_API_KEY || "";
+  const info = {
+    envKeyExists: !!key,
+    envKeyLength: key.length,
+    envKeyPrefix: key ? key.substring(0, 10) + "..." : "NONE",
+    simpleCallResult: "",
+    schemaCallResult: "",
+    modelNameUsed: MODEL_NAME,
+  };
+
+  try {
+    const ai = getGenAIClient();
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: "Responde con la palabra 'Hola'",
+    });
+    info.simpleCallResult = `ÉXITO: ${response.text ? response.text.trim() : "Respuesta vacía"}`;
+  } catch (err: any) {
+    info.simpleCallResult = `FALLO: ${err.message || err.toString()}`;
+  }
+
+  try {
+    const ai = getGenAIClient();
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: "Genera un objeto JSON de prueba con un título cualquiera en español.",
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+          },
+          required: ["title"],
+        },
+      },
+    });
+    info.schemaCallResult = `ÉXITO: ${response.text ? response.text.trim() : "Respuesta vacía"}`;
+  } catch (err: any) {
+    info.schemaCallResult = `FALLO: ${err.message || err.toString()}`;
+  }
+
+  res.json(info);
+});
+
+
 // ==========================================
 // RUTA DE IA: GENERAR RECETA CON GEMINI
 // ==========================================
