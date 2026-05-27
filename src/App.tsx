@@ -143,6 +143,72 @@ function formatDateLabel(date: Date): string {
   return `${date.getDate()} ${MONTH_NAMES_ES[date.getMonth()]}`;
 }
 
+// Auto-clasificador de categorías basado en palabras clave del nombre en español
+function suggestCategoryByName(name: string): string {
+  const lower = name.toLowerCase().trim();
+  if (!lower) return "Otros";
+
+  // 1. Verduras/Frutas
+  const fruitsVegs = [
+    "tomate", "lechuga", "zanahoria", "cebolla", "ajo", "patata", "papa", "pimiento", "pepino", "espinaca", "brocoli",
+    "calabacin", "berenjena", "seta", "champiñ", "aguacate", "limon", "naranja", "platano", "manzana", "fresa", "uvas",
+    "pera", "piña", "kiwi", "melon", "sandia", "fruta", "verdura", "ensalada", "judio", "alubia", "apio", "puerro",
+    "calabaza", "durazno", "melocoton", "ciruela", "cereza", "mango", "arandano", "frambuesa", "mora"
+  ];
+  if (fruitsVegs.some(k => lower.includes(k))) return "Verduras/Frutas";
+
+  // 2. Carnes
+  const meats = [
+    "pollo", "ternera", "cerdo", "pavo", "lomo", "jamon", "salchicha", "hamburguesa", "filete", "bacon", "beicon",
+    "carne", "costilla", "cordero", "pato", "conejo", "embutido", "chorizo", "salami", "salchichon", "pate", "foie",
+    "pechuga"
+  ];
+  if (meats.some(k => lower.includes(k))) return "Carnes";
+
+  // 3. Pescados/Mariscos
+  const fish = [
+    "salmon", "atun", "merluza", "bacalao", "sardina", "langostino", "gamba", "pulpo", "calamar", "mejillon", "almeja",
+    "pescado", "marisco", "trucha", "lubina", "dorada", "cangrejo", "bonito", "emperador", "pescadilla"
+  ];
+  if (fish.some(k => lower.includes(k))) return "Pescados/Mariscos";
+
+  // 4. Lácteos/Huevos
+  const dairy = [
+    "leche", "queso", "yogur", "mantequilla", "nata", "huevo", "crema", "flan", "cuajada", "kefir", "lacteo", "margarina"
+  ];
+  if (dairy.some(k => lower.includes(k))) return "Lácteos/Huevos";
+
+  // 5. Granos/Cereales
+  const grains = [
+    "arroz", "pan", "pasta", "macarron", "tallarin", "espagueti", "cereal", "avena", "harina", "legumbre", "lenteja",
+    "garbanzo", "trigo", "maiz", "quinoa", "galleta", "tostada"
+  ];
+  if (grains.some(k => lower.includes(k))) return "Granos/Cereales";
+
+  // 6. Bebidas/Refrescos
+  const drinks = [
+    "agua", "refresco", "coca", "fanta", "zumo", "jugo", "cerveza", "vino", "cava", "sidra", "licor", "bebida", "soda",
+    "tonica", "te", "infusion", "cafe"
+  ];
+  if (drinks.some(k => lower.includes(k))) return "Bebidas/Refrescos";
+
+  // 7. Snacks/Dulces
+  const sweets = [
+    "chocolate", "patatas fritas", "snack", "gominola", "chuche", "caramelo", "bombon", "helado", "palomitas", "fruto seco",
+    "nuez", "almendra", "pistacho", "cacahuete", "avellana", "tarta", "pastel", "bollo", "donut", "croissant"
+  ];
+  if (sweets.some(k => lower.includes(k))) return "Snacks/Dulces";
+
+  // 8. Condimentos
+  const condiments = [
+    "sal", "pimienta", "aceite", "vinagre", "mayonesa", "ketchup", "mostaza", "salsa", "especia", "oregano", "perejil",
+    "romero", "tomillo", "curry", "comino", "pimenton", "colorante", "caldo", "avecrem", "azucar", "miel"
+  ];
+  if (condiments.some(k => lower.includes(k))) return "Condimentos";
+
+  return "Otros";
+}
+
 // Tickets de ejemplo codificados en Base64 de forma abreviada para simulación y pruebas directas
 const SAMPLE_TICKET_MERCADONA = {
   name: "Ticket Mercadona (Pollo y Tomates)",
@@ -886,6 +952,7 @@ export default function App() {
     expiryDate: ""
   });
   const [editingFoodId, setEditingFoodId] = useState<string | null>(null);
+  const [isCategoryManuallySet, setIsCategoryManuallySet] = useState(false);
 
   // --- ESCANER DE TICKETS IA ---
   const [showScanner, setShowScanner] = useState(false);
@@ -1411,6 +1478,7 @@ export default function App() {
       }
 
       setNewFood({ name: "", quantity: "", unit: "g", category: "Verduras/Frutas", expiryDate: "" });
+      setIsCategoryManuallySet(false);
       setShowAddForm(false);
       fetchData();
     } catch (err: any) {
@@ -1421,6 +1489,7 @@ export default function App() {
 
   const handleEditClick = (food: any) => {
     setEditingFoodId(food.id);
+    setIsCategoryManuallySet(true);
     setNewFood({
       name: food.name,
       quantity: food.quantity.toString(),
@@ -3345,7 +3414,8 @@ export default function App() {
                 <button
                   onClick={() => {
                     setEditingFoodId(null);
-                    setNewFood({ name: "", quantity: "", unit: "g", category: "Verduras/Frutas" });
+                    setIsCategoryManuallySet(false);
+                    setNewFood({ name: "", quantity: "", unit: "g", category: "Otros", expiryDate: "" });
                     setShowAddForm(true);
                   }}
                   className="bg-emerald-600 text-white hover:bg-emerald-700 font-bold text-sm py-2.5 px-4 rounded-lg flex items-center gap-2 shadow-sm transition-all active:scale-95"
@@ -3379,7 +3449,15 @@ export default function App() {
                       required
                       placeholder="Ej. Arroz Integral"
                       value={newFood.name}
-                      onChange={(e) => setNewFood({ ...newFood, name: e.target.value })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const suggested = suggestCategoryByName(val);
+                        setNewFood(prev => ({
+                          ...prev,
+                          name: val,
+                          category: !isCategoryManuallySet ? suggested : prev.category
+                        }));
+                      }}
                       className="w-full bg-slate-50/70 p-2.5 border border-slate-200 rounded-lg text-sm focus:outline-emerald-500"
                     />
                   </div>
@@ -3417,7 +3495,10 @@ export default function App() {
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoría</label>
                     <select
                       value={newFood.category}
-                      onChange={(e) => setNewFood({ ...newFood, category: e.target.value })}
+                      onChange={(e) => {
+                        setIsCategoryManuallySet(true);
+                        setNewFood({ ...newFood, category: e.target.value });
+                      }}
                       className="w-full bg-slate-50/70 p-2.5 border border-slate-200 rounded-lg text-sm focus:outline-emerald-500 cursor-pointer"
                     >
                       {CATEGORIES.map(cat => (
