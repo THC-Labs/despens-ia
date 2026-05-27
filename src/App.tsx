@@ -68,20 +68,20 @@ const MEAL_TYPES = ["Desayuno", "Comida", "Cena", "Snack"];
 const SAMPLE_TICKET_MERCADONA = {
   name: "Ticket Mercadona (Pollo y Tomates)",
   items: [
-    { name: "Pechuga de Pollo", quantity: 500, unit: "g", category: "Carnes" },
-    { name: "Tomates frescos", quantity: 6, unit: "uds", category: "Verduras/Frutas" },
-    { name: "Huevos Orgánicos", quantity: 12, unit: "uds", category: "Lácteos/Huevos" },
-    { name: "Arroz Integral", quantity: 1000, unit: "g", category: "Granos/Cereales" }
+    { name: "Pechuga de Pollo", quantity: 500, unit: "g", category: "Carnes", estimated_shelf_life_days: 3 },
+    { name: "Tomates frescos", quantity: 6, unit: "uds", category: "Verduras/Frutas", estimated_shelf_life_days: 6 },
+    { name: "Huevos Orgánicos", quantity: 12, unit: "uds", category: "Lácteos/Huevos", estimated_shelf_life_days: 14 },
+    { name: "Arroz Integral", quantity: 1000, unit: "g", category: "Granos/Cereales", estimated_shelf_life_days: 365 }
   ]
 };
 
 const SAMPLE_TICKET_CARREFOUR = {
   name: "Ticket Carrefour (Aguacate y Lácteos)",
   items: [
-    { name: "Aguacate Maduro", quantity: 4, unit: "uds", category: "Verduras/Frutas" },
-    { name: "Leche Semidesnatada", quantity: 1000, unit: "ml", category: "Lácteos/Huevos" },
-    { name: "Queso Fresco", quantity: 250, unit: "g", category: "Lácteos/Huevos" },
-    { name: "Espinacas frescas", quantity: 300, unit: "g", category: "Verduras/Frutas" }
+    { name: "Aguacate Maduro", quantity: 4, unit: "uds", category: "Verduras/Frutas", estimated_shelf_life_days: 4 },
+    { name: "Leche Semidesnatada", quantity: 1000, unit: "ml", category: "Lácteos/Huevos", estimated_shelf_life_days: 7 },
+    { name: "Queso Fresco", quantity: 250, unit: "g", category: "Lácteos/Huevos", estimated_shelf_life_days: 5 },
+    { name: "Espinacas frescas", quantity: 300, unit: "g", category: "Verduras/Frutas", estimated_shelf_life_days: 4 }
   ]
 };
 
@@ -352,6 +352,7 @@ export default function App() {
 
   // --- ESTADOS ---
   const [inventory, setInventory] = useState<any[]>([]);
+  const [pantrySortBy, setPantrySortBy] = useState<string>("name");
   const [recipes, setRecipes] = useState<any[]>([]);
   const [mealPlan, setMealPlan] = useState<any[]>([]);
 
@@ -438,33 +439,82 @@ export default function App() {
 
   // --- AUXILIRES DE GESTIÓN DE DESPENSAS ---
   const parseCategory = (rawCategory: string) => {
-    if (!rawCategory) return { pantryId: "default", category: "Otros" };
-    const idx = rawCategory.indexOf("::");
-    if (idx !== -1) {
+    if (!rawCategory) return { pantryId: "default", category: "Otros", expiryDate: "" };
+    const parts = rawCategory.split("::");
+    if (parts.length >= 2) {
       return {
-        pantryId: rawCategory.substring(0, idx),
-        category: rawCategory.substring(idx + 2)
+        pantryId: parts[0],
+        category: parts[1],
+        expiryDate: parts[2] || ""
       };
     }
-    return { pantryId: "default", category: rawCategory };
+    return { pantryId: "default", category: rawCategory, expiryDate: "" };
   };
 
-  const encodeCategory = (pantryId: string, realCategory: string) => {
-    return `${pantryId}::${realCategory}`;
+  const encodeCategory = (pantryId: string, realCategory: string, expiryDate?: string) => {
+    return `${pantryId}::${realCategory}${expiryDate ? `::${expiryDate}` : ""}`;
   };
 
-  const activeInventory = inventory
-    .filter(food => {
-      const { pantryId } = parseCategory(food.category);
-      return pantryId === activePantryId;
-    })
-    .map(food => {
-      const { category } = parseCategory(food.category);
-      return {
-        ...food,
-        category: category
-      };
+  const getExpiryStatus = (expiryDateStr: string) => {
+    if (!expiryDateStr) return { label: "Sin fecha", color: "text-slate-400 bg-slate-100", days: Infinity, isCritical: false };
+    const expiry = new Date(expiryDateStr);
+    const today = new Date();
+    expiry.setHours(0,0,0,0);
+    today.setHours(0,0,0,0);
+    const diffTime = expiry.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return { label: "Caducado", color: "bg-rose-100 text-rose-800 border border-rose-200/50 font-bold", days: diffDays, isCritical: true, isExpired: true };
+    } else if (diffDays === 0) {
+      return { label: "Caduca hoy", color: "bg-red-100 text-red-800 border border-red-200/50 font-bold animate-pulse", days: diffDays, isCritical: true, isToday: true };
+    } else if (diffDays <= 3) {
+      return { label: `Caduca en ${diffDays}d`, color: "bg-amber-100 text-amber-800 border border-amber-200/50 font-bold", days: diffDays, isCritical: true };
+    } else {
+      const parts = expiryDateStr.split("-");
+      const formatted = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0].substring(2)}` : expiryDateStr;
+      return { label: formatted, color: "bg-emerald-50 text-emerald-800 border border-emerald-100 font-semibold", days: diffDays, isCritical: false };
+    }
+  };
+
+  const activeInventory = useMemo(() => {
+    const list = inventory
+      .filter(food => {
+        const { pantryId } = parseCategory(food.category);
+        return pantryId === activePantryId;
+      })
+      .map(food => {
+        const { category, expiryDate } = parseCategory(food.category);
+        return {
+          ...food,
+          category: category,
+          expiryDate: expiryDate || ""
+        };
+      });
+
+    if (pantrySortBy === "quantity") {
+      return list.sort((a, b) => b.quantity - a.quantity);
+    } else if (pantrySortBy === "expiry") {
+      return list.sort((a, b) => {
+        // Alimentos sin fecha de caducidad van al final
+        if (!a.expiryDate && !b.expiryDate) return a.name.localeCompare(b.name);
+        if (!a.expiryDate) return 1;
+        if (!b.expiryDate) return -1;
+        return a.expiryDate.localeCompare(b.expiryDate);
+      });
+    } else {
+      // Orden predeterminado por nombre
+      return list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+  }, [inventory, activePantryId, pantrySortBy]);
+
+  const expiringItems = useMemo(() => {
+    return activeInventory.filter(item => {
+      if (!item.expiryDate) return false;
+      const status = getExpiryStatus(item.expiryDate);
+      return status.isCritical && (parseFloat(item.quantity) > 0);
     });
+  }, [activeInventory]);
 
   const activePantry = pantries.find(p => p.id === activePantryId) || pantries[0] || { id: "default", name: "Mi Despensa", theme: "emerald" };
   const activePantryTheme = activePantry.theme || "emerald";
@@ -753,7 +803,8 @@ export default function App() {
     name: "",
     quantity: "",
     unit: "g",
-    category: "Verduras/Frutas"
+    category: "Verduras/Frutas",
+    expiryDate: ""
   });
   const [editingFoodId, setEditingFoodId] = useState<string | null>(null);
 
@@ -773,6 +824,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("despensia_use_only_pantry", String(useOnlyPantryIngredients));
   }, [useOnlyPantryIngredients]);
+
+  const [prioritizeExpiringIngredients, setPrioritizeExpiringIngredients] = useState<boolean>(() => {
+    return localStorage.getItem("despensia_prioritize_expiring") === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("despensia_prioritize_expiring", String(prioritizeExpiringIngredients));
+  }, [prioritizeExpiringIngredients]);
   const [generatingRecipe, setGeneratingRecipe] = useState(false);
   const [generatedRecipeDraft, setGeneratedRecipeDraft] = useState<any | null>(null);
   const [chefSearchQuery, setChefSearchQuery] = useState("");
@@ -1159,7 +1218,7 @@ export default function App() {
     }
 
     try {
-      const encodedCat = encodeCategory(activePantryId, newFood.category);
+      const encodedCat = encodeCategory(activePantryId, newFood.category, newFood.expiryDate);
       if (session?.user) {
         // --- MODO SUPABASE CLOUD SYNC ---
         if (editingFoodId) {
@@ -1227,7 +1286,7 @@ export default function App() {
         }
       }
 
-      setNewFood({ name: "", quantity: "", unit: "g", category: "Verduras/Frutas" });
+      setNewFood({ name: "", quantity: "", unit: "g", category: "Verduras/Frutas", expiryDate: "" });
       setShowAddForm(false);
       fetchData();
     } catch (err: any) {
@@ -1242,7 +1301,8 @@ export default function App() {
       name: food.name,
       quantity: food.quantity.toString(),
       unit: food.unit,
-      category: food.category
+      category: food.category,
+      expiryDate: food.expiryDate || ""
     });
     setShowAddForm(true);
   };
@@ -1328,8 +1388,18 @@ export default function App() {
         
         if (response.ok) {
           const parsedFoods = await response.json();
-          setScannerDraft(parsedFoods);
-          setTicketTips(`¡Analizado con éxito! Extrajimos ${parsedFoods.length} alimentos de tu ticket.`);
+          const itemsWithExpiry = parsedFoods.map((item: any) => {
+            const shelfLife = item.estimated_shelf_life_days || 7;
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + shelfLife);
+            const expiryStr = expiryDate.toISOString().split("T")[0];
+            return {
+              ...item,
+              expiryDate: expiryStr
+            };
+          });
+          setScannerDraft(itemsWithExpiry);
+          setTicketTips(`¡Analizado con éxito! Extrajimos ${itemsWithExpiry.length} alimentos de tu ticket.`);
           triggerAlert("success", "Ticket escaneado correctamente. Revisa la lista propuesta.");
         } else {
           const errData = await response.json().catch(() => ({}));
@@ -1353,8 +1423,18 @@ export default function App() {
     setScanning(true);
     setTicketTips("Cargando simulador de ticket de supermercado de alta fidelidad...");
     setTimeout(() => {
-      setScannerDraft(sample.items);
-      setTicketTips(`¡Carga instantánea! Se han extraído ${sample.items.length} alimentos.`);
+      const itemsWithExpiry = sample.items.map((item: any) => {
+        const shelfLife = item.estimated_shelf_life_days || 7;
+        const expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + shelfLife);
+        const expiryStr = expiryDate.toISOString().split("T")[0];
+        return {
+          ...item,
+          expiryDate: expiryStr
+        };
+      });
+      setScannerDraft(itemsWithExpiry);
+      setTicketTips(`¡Carga instantánea! Se han extraído ${itemsWithExpiry.length} alimentos.`);
       setScanning(false);
       triggerAlert("success", `Ejemplo "${sample.name}" cargado para revisión.`);
     }, 1500);
@@ -1389,7 +1469,11 @@ export default function App() {
             const nextQty = existing.quantity + parseFloat(item.quantity);
             const { error } = await supabase
               .from("inventory")
-              .update({ quantity: nextQty, last_updated: new Date().toISOString() })
+              .update({
+                quantity: nextQty,
+                category: encodeCategory(activePantryId, existing.category, item.expiryDate || existing.expiryDate),
+                last_updated: new Date().toISOString()
+              })
               .eq("id", existing.id)
               .eq("user_id", session.user.id);
             if (error) throw error;
@@ -1400,7 +1484,7 @@ export default function App() {
                 name: item.name,
                 quantity: parseFloat(item.quantity),
                 unit: item.unit,
-                category: encodeCategory(activePantryId, item.category),
+                category: encodeCategory(activePantryId, item.category, item.expiryDate),
                 user_id: session.user.id,
                 last_updated: new Date().toISOString()
               });
@@ -1413,7 +1497,8 @@ export default function App() {
               method: "PUT",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                quantity: existing.quantity + parseFloat(item.quantity)
+                quantity: existing.quantity + parseFloat(item.quantity),
+                category: encodeCategory(activePantryId, existing.category, item.expiryDate || existing.expiryDate)
               })
             });
           } else {
@@ -1424,7 +1509,7 @@ export default function App() {
                 name: item.name,
                 quantity: parseFloat(item.quantity),
                 unit: item.unit,
-                category: encodeCategory(activePantryId, item.category)
+                category: encodeCategory(activePantryId, item.category, item.expiryDate)
               })
             });
           }
@@ -1474,11 +1559,13 @@ export default function App() {
         return inventoryItem ? {
           name: inventoryItem.name,
           quantity: inventoryItem.quantity,
-          unit: inventoryItem.unit
+          unit: inventoryItem.unit,
+          expiryDate: inventoryItem.expiryDate || ""
         } : {
           name: name,
           quantity: 0,
-          unit: ""
+          unit: "",
+          expiryDate: ""
         };
       });
 
@@ -1492,7 +1579,8 @@ export default function App() {
           preferences: profilePrefs.preferences,
           cookingStyle: profilePrefs.cookingStyle,
           forceRegenerate: force === true,
-          useOnlyPantryIngredients: useOnlyPantryIngredients
+          useOnlyPantryIngredients: useOnlyPantryIngredients,
+          prioritizeExpiringIngredients: prioritizeExpiringIngredients
         })
       });
 
@@ -3079,6 +3167,20 @@ export default function App() {
                     ))}
                   </select>
                 </div>
+
+                {/* Ordenación de inventario */}
+                <div className="relative">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">Ordenar:</span>
+                  <select
+                    value={pantrySortBy}
+                    onChange={(e) => setPantrySortBy(e.target.value)}
+                    className="pl-16 pr-8 py-2 bg-slate-50/50 rounded-lg text-sm border border-slate-200 appearance-none focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer font-semibold text-slate-700"
+                  >
+                    <option value="name">Alfabético (A-Z)</option>
+                    <option value="expiry">Caducidad (Próxima)</option>
+                    <option value="quantity">Cantidad (Mayor)</option>
+                  </select>
+                </div>
               </div>
 
               {/* Botónes de acción */}
@@ -3139,9 +3241,9 @@ export default function App() {
                   </button>
                 </div>
 
-                <form onSubmit={handleAddFood} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                <form onSubmit={handleAddFood} className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
                   
-                  <div className="sm:col-span-1">
+                  <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nombre del Alimento</label>
                     <input
                       type="text"
@@ -3195,7 +3297,17 @@ export default function App() {
                     </select>
                   </div>
 
-                  <div className="sm:col-span-4 flex justify-end gap-3 mt-2">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Fecha de Caducidad</label>
+                    <input
+                      type="date"
+                      value={newFood.expiryDate}
+                      onChange={(e) => setNewFood({ ...newFood, expiryDate: e.target.value })}
+                      className="w-full bg-slate-50/70 p-2.5 border border-slate-200 rounded-lg text-sm focus:outline-emerald-500 cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-5 flex justify-end gap-3 mt-2">
                     <button
                       type="submit"
                       className="bg-emerald-600 text-white font-bold px-6 py-2.5 rounded-lg text-sm hover:bg-emerald-700 transition-colors shadow-sm"
@@ -3335,6 +3447,13 @@ export default function App() {
                                 <option key={cat} value={cat}>{cat}</option>
                               ))}
                             </select>
+                            <input
+                              type="date"
+                              value={item.expiryDate || ""}
+                              onChange={(e) => handleUpdateDraftItem(idx, "expiryDate", e.target.value)}
+                              className="bg-slate-50 text-[11px] font-semibold text-slate-600 p-1.5 rounded-md border border-slate-100 cursor-pointer w-28"
+                              title="Fecha de Caducidad estimada"
+                            />
                           </div>
 
                           <button 
@@ -3368,6 +3487,31 @@ export default function App() {
             )}
 
             {/* TABLA DE INVENTARIO FÍSICO */}
+            {expiringItems.length > 0 && (
+              <div className="bg-rose-50/70 border border-rose-100 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-rose-100 p-2 rounded-lg text-rose-600">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-800">¡Alerta de Caducidad Inminente!</h4>
+                    <p className="text-xs text-slate-500">Tienes {expiringItems.length} {expiringItems.length === 1 ? "alimento" : "alimentos"} que {expiringItems.length === 1 ? "ha caducado o está" : "han caducado o están"} a punto de caducar.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setPantrySortBy("expiry");
+                      triggerAlert("info", "Ordenando despensa por fecha de caducidad.");
+                    }}
+                    className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-bold text-xs py-1.5 px-3 rounded-lg shadow-3xs flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    Ver primero
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-white rounded-xl border border-slate-100 shadow-xs overflow-hidden">
               <div className="bg-slate-50/50 px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-4">
                 <div>
@@ -3396,6 +3540,7 @@ export default function App() {
                         <th className="py-3.5 px-6 table-cell">Propuesta</th>
                         <th className="py-3.5 px-6">Ingrediente</th>
                         <th className="py-3.5 px-6">Categoría</th>
+                        <th className="py-3.5 px-6">Caducidad</th>
                         <th className="py-3.5 px-6 text-center">Disponible</th>
                         <th className="py-3.5 px-6 text-right">Acción</th>
                       </tr>
@@ -3440,6 +3585,17 @@ export default function App() {
                                 <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md text-xs font-semibold">
                                   {food.category || "Otros"}
                                 </span>
+                              </td>
+
+                              <td className="py-4 px-6 text-slate-500">
+                                {(() => {
+                                  const status = getExpiryStatus(food.expiryDate);
+                                  return (
+                                    <span className={`px-2.5 py-1 rounded-md text-xs ${status.color}`}>
+                                      {status.label}
+                                    </span>
+                                  );
+                                })()}
                               </td>
 
                               {/* Cantidad interactiva +/- */}
@@ -3632,16 +3788,28 @@ export default function App() {
                   />
                 </div>
 
-                {/* Ingredientes exclusivos checkbox */}
-                <div className="pt-1">
+                {/* Ingredientes exclusivos y caducidad checkboxes */}
+                <div className="pt-1 space-y-2.5">
                   <label className="flex items-center gap-2.5 text-xs font-bold text-slate-100 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={useOnlyPantryIngredients}
                       onChange={(e) => setUseOnlyPantryIngredients(e.target.checked)}
-                      className="w-4 h-4 rounded text-emerald-600 border-white/20 accent-emerald-600 focus:ring-emerald-500"
+                      className="w-4 h-4 rounded text-emerald-600 border-white/20 accent-emerald-600 focus:ring-emerald-500 cursor-pointer"
                     />
                     <span>Exclusivo: Usar únicamente los ingredientes seleccionados de mi despensa</span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 text-xs font-bold text-slate-100 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={prioritizeExpiringIngredients}
+                      onChange={(e) => setPrioritizeExpiringIngredients(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-500 border-white/20 accent-amber-500 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <span className="flex items-center gap-1.5">
+                      🍂 Priorizar ingredientes próximos a caducar <span className="text-[9px] bg-amber-500/35 text-amber-200 px-1.5 py-0.5 rounded font-mono font-black uppercase tracking-wide">Desperdicio Cero</span>
+                    </span>
                   </label>
                 </div>
 

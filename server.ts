@@ -394,16 +394,30 @@ app.get("/api/gemini/test", async (req, res) => {
 // RUTA DE IA: GENERAR RECETA CON GEMINI
 // ==========================================
 app.post("/api/gemini/recipe", async (req, res) => {
-  const { selectedIngredients, extraPrompt, allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients } = req.body;
+  const { selectedIngredients, extraPrompt, allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients, prioritizeExpiringIngredients } = req.body;
   
   console.log("[Gemini Recipe] Ingredientes recibidos:", JSON.stringify(selectedIngredients));
-  console.log("[Gemini Recipe] Preferencias:", { allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients });
+  console.log("[Gemini Recipe] Preferencias:", { allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients, prioritizeExpiringIngredients });
 
   if (!selectedIngredients || selectedIngredients.length === 0) {
     return res.status(400).json({ error: "No seleccionaste ningún ingrediente de tu despensa." });
   }
 
-  const ingredientsListStr = selectedIngredients.map((item: any) => `- ${item.name} (${item.quantity} ${item.unit})`).join("\n");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const ingredientsListStr = selectedIngredients.map((item: any) => {
+    let tag = "";
+    if (prioritizeExpiringIngredients && item.expiryDate) {
+      const expiry = new Date(item.expiryDate);
+      expiry.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays <= 3) {
+        tag = " [PRÓXIMO A CADUCAR]";
+      }
+    }
+    return `- ${item.name} (${item.quantity} ${item.unit})${tag}`;
+  }).join("\n");
+
   const allergiesStr = allergies && allergies.length > 0 ? allergies.join(", ") : "Ninguna";
   const preferencesStr = preferences && preferences.length > 0 ? preferences.join(", ") : "Ninguna";
   const cookingStyleStr = cookingStyle || "Saludable y Balanceada";
@@ -413,7 +427,7 @@ app.post("/api/gemini/recipe", async (req, res) => {
     .map((item: any) => `${item.name.trim().toLowerCase()}:${item.quantity}${item.unit}`)
     .sort()
     .join("|");
-  const cacheKeyInput = `ingredients:${sortedNames};allergies:${allergiesStr.toLowerCase()};preferences:${preferencesStr.toLowerCase()};style:${cookingStyleStr.toLowerCase()};extra:${(extraPrompt || "").trim().toLowerCase()};onlyPantry:${!!useOnlyPantryIngredients}`;
+  const cacheKeyInput = `ingredients:${sortedNames};allergies:${allergiesStr.toLowerCase()};preferences:${preferencesStr.toLowerCase()};style:${cookingStyleStr.toLowerCase()};extra:${(extraPrompt || "").trim().toLowerCase()};onlyPantry:${!!useOnlyPantryIngredients};prioritizeExpiring:${!!prioritizeExpiringIngredients}`;
   const cacheKey = crypto.createHash("md5").update(cacheKeyInput).digest("hex");
 
   const db = readDb();
@@ -447,6 +461,8 @@ Restricciones y Preferencias de Salud/Dieta del Usuario:
 ${extraPrompt ? `Instrucciones o preferencias adicionales del usuario: "${extraPrompt}"` : ""}
 
   ${useOnlyPantryIngredients ? `REGLA DE ORO CRÍTICA: La receta debe contener EXCLUSIVAMENTE los ingredientes listados arriba de tu despensa. No agregues ningún otro ingrediente, condimento, especia o grasa (como aceite) que no figure en la lista (puedes asumir únicamente agua y sal común si son indispensables para la preparación, pero nada más).` : ""}
+
+  ${prioritizeExpiringIngredients ? `REGLA DE REAPROVECHAMIENTO CRÍTICA: Los ingredientes listados arriba que tienen la marca "[PRÓXIMO A CADUCAR]" están muy cerca de vencer. Debes priorizar el uso obligatorio de estos ingredientes en la receta para evitar el desperdicio.` : ""}
 
   Crea una receta deliciosa, creativa y balanceada utilizando todos o algunos de estos ingredientes. 
   Devuelve la respuesta strictly en formato JSON con la siguiente estructura (no agregues texto fuera de esta estructura JSON):
@@ -564,10 +580,11 @@ Para cada ítem, extrae:
 - quantity: Cantidad numérica real (ej. 3 o 1.5)
 - unit: Unidad estándar ('uds', 'g', 'kg', 'ml', 'litros')
 - category: Elige estrictamente una de estas categorías: 'Verduras/Frutas', 'Carnes', 'Lácteos/Huevos', 'Granos/Cereales', 'Congelados', 'Despensa/Otros', 'Bebidas/Refrescos', 'Snacks/Dulces', 'Condimentos'.
+- estimated_shelf_life_days: Estima la cantidad de días que dura este producto fresco antes de caducar a partir de hoy (ej. verduras frescas: 7, carne: 3, huevos: 14, leche: 7, arroz: 365, condimentos/conservas: 360). Sé conservador.
 
 Devuelve estrictamente un array JSON plano con la siguiente estructura (no rodees la respuesta con comillas adicionales o texto explicativo):
 [
-  { "name": "Nombre Alimento", "quantity": 2, "unit": "uds", "category": "Lácteos/Huevos" }
+  { "name": "Nombre Alimento", "quantity": 2, "unit": "uds", "category": "Lácteos/Huevos", "estimated_shelf_life_days": 7 }
 ]
 Asegúrate de responder estrictamente en español.`
   };
@@ -586,9 +603,10 @@ Asegúrate de responder estrictamente en español.`
               name: { type: Type.STRING },
               quantity: { type: Type.NUMBER },
               unit: { type: Type.STRING },
-              category: { type: Type.STRING }
+              category: { type: Type.STRING },
+              estimated_shelf_life_days: { type: Type.NUMBER }
             },
-            required: ["name", "quantity", "unit", "category"]
+            required: ["name", "quantity", "unit", "category", "estimated_shelf_life_days"]
           }
         }
       }
