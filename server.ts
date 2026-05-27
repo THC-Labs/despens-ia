@@ -231,6 +231,12 @@ app.get("/api/recipes", (req, res) => {
 
 app.post("/api/recipes", (req, res) => {
   const db = readDb();
+  
+  // Buscar si hay imagen cacheada en el servidor para este título
+  const normalizedTitle = (req.body.title || "").trim().toLowerCase();
+  const cachedImage = db.images_cache?.find((img: any) => img.title === normalizedTitle);
+  const coverUrl = req.body.cover_url || cachedImage?.imageUrl || "";
+
   const newRecipe = {
     id: "r_" + Math.random().toString(36).substring(2, 9),
     title: req.body.title,
@@ -238,6 +244,7 @@ app.post("/api/recipes", (req, res) => {
     instructions: req.body.instructions,
     macros_summary: req.body.macros_summary || "",
     likes: 0,
+    cover_url: coverUrl,
     created_at: new Date().toISOString()
   };
   db.recipes.push(newRecipe);
@@ -264,6 +271,26 @@ app.delete("/api/recipes/:id", (req, res) => {
   db.meal_plan = db.meal_plan.filter((item: any) => item.recipe_id !== req.params.id);
   writeDb(db);
   res.json({ success: true });
+});
+
+app.put("/api/recipes/:id", (req, res) => {
+  const db = readDb();
+  const idx = db.recipes.findIndex((r: any) => r.id === req.params.id);
+  if (idx > -1) {
+    db.recipes[idx] = {
+      ...db.recipes[idx],
+      title: req.body.title !== undefined ? req.body.title : db.recipes[idx].title,
+      ingredients_required: req.body.ingredients_required !== undefined ? req.body.ingredients_required : db.recipes[idx].ingredients_required,
+      instructions: req.body.instructions !== undefined ? req.body.instructions : db.recipes[idx].instructions,
+      macros_summary: req.body.macros_summary !== undefined ? req.body.macros_summary : db.recipes[idx].macros_summary,
+      cover_url: req.body.cover_url !== undefined ? req.body.cover_url : db.recipes[idx].cover_url,
+      likes: req.body.likes !== undefined ? req.body.likes : db.recipes[idx].likes
+    };
+    writeDb(db);
+    res.json(db.recipes[idx]);
+  } else {
+    res.status(404).json({ error: "Receta no encontrada" });
+  }
 });
 
 
@@ -367,10 +394,10 @@ app.get("/api/gemini/test", async (req, res) => {
 // RUTA DE IA: GENERAR RECETA CON GEMINI
 // ==========================================
 app.post("/api/gemini/recipe", async (req, res) => {
-  const { selectedIngredients, extraPrompt, allergies, preferences, cookingStyle, forceRegenerate } = req.body;
+  const { selectedIngredients, extraPrompt, allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients } = req.body;
   
   console.log("[Gemini Recipe] Ingredientes recibidos:", JSON.stringify(selectedIngredients));
-  console.log("[Gemini Recipe] Preferencias:", { allergies, preferences, cookingStyle, forceRegenerate });
+  console.log("[Gemini Recipe] Preferencias:", { allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients });
 
   if (!selectedIngredients || selectedIngredients.length === 0) {
     return res.status(400).json({ error: "No seleccionaste ningún ingrediente de tu despensa." });
@@ -386,7 +413,7 @@ app.post("/api/gemini/recipe", async (req, res) => {
     .map((item: any) => `${item.name.trim().toLowerCase()}:${item.quantity}${item.unit}`)
     .sort()
     .join("|");
-  const cacheKeyInput = `ingredients:${sortedNames};allergies:${allergiesStr.toLowerCase()};preferences:${preferencesStr.toLowerCase()};style:${cookingStyleStr.toLowerCase()};extra:${(extraPrompt || "").trim().toLowerCase()}`;
+  const cacheKeyInput = `ingredients:${sortedNames};allergies:${allergiesStr.toLowerCase()};preferences:${preferencesStr.toLowerCase()};style:${cookingStyleStr.toLowerCase()};extra:${(extraPrompt || "").trim().toLowerCase()};onlyPantry:${!!useOnlyPantryIngredients}`;
   const cacheKey = crypto.createHash("md5").update(cacheKeyInput).digest("hex");
 
   const db = readDb();
@@ -419,8 +446,10 @@ Restricciones y Preferencias de Salud/Dieta del Usuario:
 
 ${extraPrompt ? `Instrucciones o preferencias adicionales del usuario: "${extraPrompt}"` : ""}
 
-Crea una receta deliciosa, creativa y balanceada utilizando todos o algunos de estos ingredientes. 
-Devuelve la respuesta strictly en formato JSON con la siguiente estructura (no agregues texto fuera de esta estructura JSON):
+  ${useOnlyPantryIngredients ? `REGLA DE ORO CRÍTICA: La receta debe contener EXCLUSIVAMENTE los ingredientes listados arriba de tu despensa. No agregues ningún otro ingrediente, condimento, especia o grasa (como aceite) que no figure en la lista (puedes asumir únicamente agua y sal común si son indispensables para la preparación, pero nada más).` : ""}
+
+  Crea una receta deliciosa, creativa y balanceada utilizando todos o algunos de estos ingredientes. 
+  Devuelve la respuesta strictly en formato JSON con la siguiente estructura (no agregues texto fuera de esta estructura JSON):
 {
   "title": "Nombre creativo e inspirador de la receta (en español)",
   "ingredients_required": [
@@ -670,6 +699,19 @@ app.post("/api/gemini/generate-recipe-image", async (req, res) => {
     return res.status(400).json({ error: "Falta el título de la receta para generar la ilustración." });
   }
 
+  const db = readDb();
+  if (!db.images_cache) {
+    db.images_cache = [];
+  }
+
+  // Buscar en caché por título (normalizado)
+  const normalizedTitle = recipeTitle.trim().toLowerCase();
+  const cachedImage = db.images_cache.find((img: any) => img.title === normalizedTitle);
+  if (cachedImage) {
+    console.log(`[IMAGE CACHE HIT] Retornando imagen guardada en caché para: ${normalizedTitle}`);
+    return res.json({ imageUrl: cachedImage.imageUrl });
+  }
+
   // Validar y descontar cuota mensual de IA
   if (!checkAndIncrementAiUsage()) {
     // Si la cuota expira, retornamos la imagen de placeholder directamente en lugar de fallar
@@ -709,7 +751,17 @@ app.post("/api/gemini/generate-recipe-image", async (req, res) => {
     }
 
     if (base64Image) {
-      res.json({ imageUrl: `data:image/png;base64,${base64Image}` });
+      const imageUrl = `data:image/png;base64,${base64Image}`;
+      
+      // Guardar en la caché local del servidor
+      db.images_cache.push({
+        title: normalizedTitle,
+        imageUrl: imageUrl,
+        created_at: new Date().toISOString()
+      });
+      writeDb(db);
+
+      res.json({ imageUrl: imageUrl });
     } else {
       throw new Error("No se devolvió un bloque de imagen base64 de Gemini.");
     }
@@ -718,6 +770,18 @@ app.post("/api/gemini/generate-recipe-image", async (req, res) => {
     // URL de placeholder amigable si la generación de imágenes por cuotas de API falla/no está de pago
     res.json({ imageUrl: `https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=400&q=80` });
   }
+});
+
+app.get("/api/gemini/recipe-covers", (req, res) => {
+  const db = readDb();
+  const cache = db.images_cache || [];
+  const map: Record<string, string> = {};
+  for (const entry of cache) {
+    if (entry.title && entry.imageUrl) {
+      map[entry.title.trim().toLowerCase()] = entry.imageUrl;
+    }
+  }
+  res.json(map);
 });
 
 

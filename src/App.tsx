@@ -766,6 +766,13 @@ export default function App() {
   // --- CHEF IA: GENERADOR ---
   const [selectedForRecipe, setSelectedForRecipe] = useState<string[]>([]);
   const [chefExtraPrompt, setChefExtraPrompt] = useState("");
+  const [useOnlyPantryIngredients, setUseOnlyPantryIngredients] = useState<boolean>(() => {
+    return localStorage.getItem("despensia_use_only_pantry") === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("despensia_use_only_pantry", String(useOnlyPantryIngredients));
+  }, [useOnlyPantryIngredients]);
   const [generatingRecipe, setGeneratingRecipe] = useState(false);
   const [generatedRecipeDraft, setGeneratedRecipeDraft] = useState<any | null>(null);
   const [chefSearchQuery, setChefSearchQuery] = useState("");
@@ -913,6 +920,16 @@ export default function App() {
 
   const fetchData = async () => {
     try {
+      let cachedCovers: Record<string, string> = {};
+      try {
+        const resCovers = await fetch("/api/gemini/recipe-covers");
+        if (resCovers.ok) {
+          cachedCovers = await resCovers.json();
+        }
+      } catch (e) {
+        console.warn("No se pudieron cargar las portadas del servidor:", e);
+      }
+
       if (session?.user) {
         // --- MODO SUPABASE CLOUD SYNC ACTIVO ---
         const [resInv, resRec, resPlan] = await Promise.all([
@@ -925,8 +942,17 @@ export default function App() {
         if (resRec.error) throw resRec.error;
         if (resPlan.error) throw resPlan.error;
 
+        const covers = getRecipeCovers();
+        const recipesWithCovers = (resRec.data || []).map((r: any) => {
+          const normTitle = (r.title || "").trim().toLowerCase();
+          return {
+            ...r,
+            cover_url: r.cover_url || covers[r.id] || cachedCovers[normTitle] || ""
+          };
+        });
+
         setInventory(resInv.data || []);
-        setRecipes(resRec.data || []);
+        setRecipes(recipesWithCovers);
         setMealPlan(resPlan.data || []);
       } else {
         // --- MODO SANDBOX LOCAL FALLBACK (EXPRESS SERVER) ---
@@ -940,8 +966,17 @@ export default function App() {
           const rec = await resRec.json();
           const plan = await resPlan.json();
 
+          const covers = getRecipeCovers();
+          const recipesWithCovers = rec.map((r: any) => {
+            const normTitle = (r.title || "").trim().toLowerCase();
+            return {
+              ...r,
+              cover_url: r.cover_url || covers[r.id] || cachedCovers[normTitle] || ""
+            };
+          });
+
           setInventory(inv);
-          setRecipes(rec);
+          setRecipes(recipesWithCovers);
           setMealPlan(plan);
         }
       }
@@ -1456,7 +1491,8 @@ export default function App() {
           allergies: profilePrefs.allergies,
           preferences: profilePrefs.preferences,
           cookingStyle: profilePrefs.cookingStyle,
-          forceRegenerate: force === true
+          forceRegenerate: force === true,
+          useOnlyPantryIngredients: useOnlyPantryIngredients
         })
       });
 
@@ -1647,6 +1683,25 @@ export default function App() {
     }
   };
 
+  const getRecipeCovers = () => {
+    try {
+      const saved = localStorage.getItem("despensia_recipe_covers");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const saveRecipeCover = (recipeId: string, imageUrl: string) => {
+    try {
+      const covers = getRecipeCovers();
+      covers[recipeId] = imageUrl;
+      localStorage.setItem("despensia_recipe_covers", JSON.stringify(covers));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleGenerateRecipeCover = async (recipe: any) => {
     triggerAlert("info", `Generando fotografía gourmet integrada para "${recipe.title}"...`);
     try {
@@ -1657,9 +1712,32 @@ export default function App() {
       });
       if (res.ok) {
         const data = await res.json();
-        // El servidor nos da una URL (puede ser un base64 o una imagen web)
-        // Guardarla temporalmente/en el estado del componente
+        
+        // 1. Guardar en el estado local de React
         setRecipes(prev => prev.map(r => r.id === recipe.id ? { ...r, cover_url: data.imageUrl } : r));
+        
+        // 2. Guardar en el caché local de localStorage
+        saveRecipeCover(recipe.id, data.imageUrl);
+        
+        // 3. Persistir en la base de datos correspondiente
+        if (session?.user) {
+          try {
+            await supabase
+              .from("recipes")
+              .update({ cover_url: data.imageUrl })
+              .eq("id", recipe.id)
+              .eq("user_id", session.user.id);
+          } catch (e) {
+            console.warn("No se pudo actualizar la columna cover_url en Supabase (puede no existir). Guardado en localStorage fallback.", e);
+          }
+        } else {
+          await fetch(`/api/recipes/${recipe.id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cover_url: data.imageUrl })
+          });
+        }
+        
         triggerAlert("success", `Cover personalizado generado para "${recipe.title}".`);
       } else {
         const errData = await res.json().catch(() => ({}));
@@ -1676,6 +1754,17 @@ export default function App() {
   const handleDeleteRecipe = async (id: string, name: string) => {
     if (!confirm(`¿Eliminar la receta "${name}" de tu catálogo? Se borrará también de los planes semanal.`)) return;
     try {
+      // Limpiar del caché de portadas en localStorage
+      try {
+        const covers = getRecipeCovers();
+        if (covers[id]) {
+          delete covers[id];
+          localStorage.setItem("despensia_recipe_covers", JSON.stringify(covers));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
       if (session?.user) {
         // --- MODO CLOUD (SUPABASE) ---
         const { error } = await supabase
@@ -3541,6 +3630,19 @@ export default function App() {
                     onChange={(e) => setChefExtraPrompt(e.target.value)}
                     className="w-full bg-white/10 placeholder-emerald-200/75 border border-white/25 border-emerald-400 rounded-lg p-3 text-sm focus:outline-none focus:bg-white/25 transition-all text-white"
                   />
+                </div>
+
+                {/* Ingredientes exclusivos checkbox */}
+                <div className="pt-1">
+                  <label className="flex items-center gap-2.5 text-xs font-bold text-slate-100 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={useOnlyPantryIngredients}
+                      onChange={(e) => setUseOnlyPantryIngredients(e.target.checked)}
+                      className="w-4 h-4 rounded text-emerald-600 border-white/20 accent-emerald-600 focus:ring-emerald-500"
+                    />
+                    <span>Exclusivo: Usar únicamente los ingredientes seleccionados de mi despensa</span>
+                  </label>
                 </div>
 
                 {/* Sugerencia de Receta Popular si coincide con ingredientes */}
