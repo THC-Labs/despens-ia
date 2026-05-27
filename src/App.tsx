@@ -1386,16 +1386,16 @@ export default function App() {
               <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1 rounded-full text-emerald-400 text-xs font-semibold">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Potenciado con Gemini 3.5 Flash</span>
+                  <span>Potenciado con Gemini AI</span>
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
-                  Gestiona tu despensa. <br />
+                  Escanea tu compra. <br />
                   <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-                    Cocina sin desperdiciar.
+                    Cocina con lo que tienes.
                   </span>
                 </h1>
                 <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-medium">
-                  Organiza tus ingredientes en casa, escanea recibos del supermercado con tu cámara, agenda menús semanales y genera deliciosas recetas personalizadas por Inteligencia Artificial con lo que tienes en stock.
+                  Despensia lee tus tickets de supermercado, gestiona tu stock automáticamente y te propone recetas inteligentes con Inteligencia Artificial. Ahorra tiempo, reduce el desperdicio y simplifica tu día a día.
                 </p>
 
                 <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
@@ -1428,72 +1428,77 @@ export default function App() {
                   </div>
                   <div className="pl-6">
                     <span className="block text-2xl font-extrabold text-white">Cloud Sync</span>
-                    <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Acceso Móvil Real</span>
+                    <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Acceso en Tiempo Real</span>
                   </div>
                 </div>
               </div>
 
-              {/* Right Column: Visual Mockup Showcase */}
-              <div className="lg:col-span-5 relative w-full max-w-md mx-auto lg:max-w-none">
-                <div className="relative z-10 space-y-4">
-                  {/* Miniature Pantry Card */}
-                  <div className="bg-slate-850/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex items-center justify-between hover:translate-x-2 transition-transform duration-300 backdrop-blur-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl">
-                        <AlertTriangle className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Poco Stock en Despensa</h4>
-                        <p className="text-sm font-bold text-white mt-0.5">Tomates frescos: 2 uds</p>
-                      </div>
+              {/* Right Column: Visual Mockup Showcase (Animated Flow) */}
+              <div className="lg:col-span-5 relative w-full min-h-[460px] flex items-center justify-center">
+                {/* Glowing Background Lights */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-emerald-500/15 rounded-full blur-[60px] animate-pulse-glow" />
+                
+                <div className="w-full relative space-y-6">
+                  {/* Step 1: Scan Mockup */}
+                  <div className="bg-white/95 text-slate-800 p-4.5 rounded-2xl shadow-2xl w-56 font-mono text-[10px] relative overflow-hidden border border-slate-200 hover:-rotate-1 hover:scale-102 transition-all duration-300 mr-auto">
+                    {/* Glowing Scan Line */}
+                    <div className="absolute left-0 right-0 h-0.5 bg-emerald-500 shadow-md shadow-emerald-450 animate-scanline" />
+                    
+                    <div className="border-b border-dashed border-slate-350 pb-2 mb-2 text-center font-bold tracking-wider text-slate-600">
+                      🛒 SUPERMERCADO DESPENSIA
                     </div>
-                    <span className="bg-rose-950 text-rose-400 text-[10px] font-extrabold px-2.5 py-1 rounded-md border border-rose-900/60 font-mono">
-                      ⚠️ Reponer
-                    </span>
+                    <div className="space-y-1 text-slate-750 font-bold">
+                      <div className="flex justify-between"><span>POLLO EN FILETES</span><span>5.80€</span></div>
+                      <div className="flex justify-between"><span>TOMATES FRESCOS</span><span>1.95€</span></div>
+                      <div className="flex justify-between"><span>CEBOLLA MORADA</span><span>1.20€</span></div>
+                    </div>
+                    <div className="border-t border-dashed border-slate-350 mt-2.5 pt-2 flex justify-between font-bold text-emerald-600 text-[9px]">
+                      <span>EXTRAÍDO CON IA</span>
+                      <span>✓ EN STOCK</span>
+                    </div>
                   </div>
 
-                  {/* Miniature Gemini suggestion Card */}
-                  <div className="bg-slate-855/95 border border-emerald-500/40 p-6 rounded-3xl shadow-2xl space-y-4 relative overflow-hidden group hover:-translate-y-1 transition-transform duration-300 backdrop-blur-xs">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl" />
-                    <div className="flex items-center justify-between">
-                      <span className="bg-emerald-950 text-emerald-400 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border border-emerald-900/50 flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-emerald-400" /> Gemini Chef
+                  {/* Step 2: Floating Stock Badges */}
+                  <div className="absolute top-12 right-4 bg-slate-850/95 border border-slate-800 px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-3 animate-float-slow backdrop-blur-xs">
+                    <span className="text-lg">🍗</span>
+                    <div>
+                      <div className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">Pollo</div>
+                      <div className="text-xs font-black text-white mt-0.5">1.0 kg</div>
+                    </div>
+                  </div>
+
+                  <div className="absolute top-36 right-12 bg-slate-850/95 border border-slate-800 px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-3 animate-float-slow [animation-delay:2s] backdrop-blur-xs">
+                    <span className="text-lg">🍅</span>
+                    <div>
+                      <div className="text-[9px] text-slate-400 font-extrabold uppercase tracking-wider">Tomates</div>
+                      <div className="text-xs font-black text-white mt-0.5">3 uds</div>
+                    </div>
+                  </div>
+
+                  {/* Step 3: Recipe suggestion Mockup */}
+                  <div className="bg-slate-850/95 border border-emerald-500/40 p-5 rounded-3xl shadow-2xl w-68 ml-auto relative overflow-hidden backdrop-blur-xs hover:rotate-1 hover:scale-102 transition-all duration-300">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl animate-pulse-glow" />
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="bg-emerald-950 text-emerald-400 text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded border border-emerald-900/50 flex items-center gap-1">
+                        <Sparkles className="w-2.5 h-2.5 text-emerald-400" /> Sugerencia IA
                       </span>
-                      <span className="text-[10px] text-slate-500 font-semibold font-mono">350 kcal</span>
+                      <span className="text-[9px] text-slate-500 font-bold font-mono">15 min</span>
                     </div>
                     <div>
-                      <h4 className="text-base font-black text-white tracking-tight">Fajitas de Pollo Fit</h4>
-                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">Sugerencia inteligente basada en tu stock (Pollo y Tomates).</p>
-                    </div>
-                    <div className="flex gap-1.5">
-                      <span className="text-[9px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded border border-slate-750">Pechuga de Pollo</span>
-                      <span className="text-[9px] bg-slate-800 text-slate-300 font-mono px-2 py-0.5 rounded border border-slate-750">Tomates</span>
+                      <h4 className="text-sm font-black text-white tracking-tight">Fajitas de Pollo Express</h4>
+                      <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                        Receta recomendada basándose en tus tomates y pollo en stock.
+                      </p>
                     </div>
                     <button 
                       onClick={() => {
                         setGuestMode(true);
                         triggerAlert("info", "Iniciando preparación en modo Invitado.");
                       }}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] uppercase tracking-wider py-2.5 rounded-xl flex items-center justify-center gap-1 cursor-pointer"
+                      className="w-full mt-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-[9px] uppercase tracking-wider py-2.5 rounded-xl flex items-center justify-center gap-1 cursor-pointer transition-all shadow-md shadow-emerald-900/10"
                     >
-                      <Play className="w-3 h-3 fill-white" /> Cocinar en Vivo
+                      <Play className="w-2.5 h-2.5 fill-white" /> Cocinar en Vivo
                     </button>
-                  </div>
-
-                  {/* Miniature Weekly Planner card */}
-                  <div className="bg-slate-850/90 border border-slate-800 p-5 rounded-2xl shadow-xl flex items-center justify-between hover:-translate-x-2 transition-transform duration-300 backdrop-blur-xs">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-xl">
-                        <Calendar className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-black uppercase text-slate-400 tracking-wider">Plan Semanal</h4>
-                        <p className="text-sm font-bold text-white mt-0.5">Comida agendada para el Miércoles</p>
-                      </div>
-                    </div>
-                    <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-2.5 py-1 rounded-md font-mono border border-slate-700/60">
-                      Miércoles
-                    </span>
                   </div>
                 </div>
               </div>
@@ -1502,49 +1507,104 @@ export default function App() {
           </div>
         </section>
 
-        {/* Features details Section */}
+        {/* Step-by-Step Flow Section */}
         <section className="py-24 border-t border-slate-800/80 bg-slate-950/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center max-w-3xl mx-auto space-y-4 mb-16">
-              <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">Características Principales</span>
-              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Todo lo que necesitas para tu cocina digital</h2>
-              <p className="text-sm sm:text-base leading-relaxed text-slate-400">
-                Despensia combina análisis visual multimodal de tickets, sugerencias de chefs de inteligencia artificial y planificación de menús en una sola interfaz premium.
+              <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">¿Cómo Funciona?</span>
+              <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">Tu Cocina Inteligente en 3 Pasos</h2>
+              <p className="text-sm sm:text-base text-slate-400 font-medium max-w-xl mx-auto">
+                Despensia automatiza todo el proceso: desde que entras al supermercado hasta que sirves el plato.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Feature 1 */}
-              <div className="bg-slate-850/40 border border-slate-800/80 rounded-2xl p-6 hover:shadow-lg hover:border-slate-700/60 transition-all duration-300 hover:-translate-y-1">
-                <div className="w-12 h-12 bg-emerald-600/10 border border-emerald-600/20 text-emerald-400 rounded-xl flex items-center justify-center mb-6">
-                  <Camera className="w-6 h-6" />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Paso 1 */}
+              <div className="bg-slate-850/40 border border-slate-800/80 rounded-3xl p-6 flex flex-col justify-between hover:border-emerald-500/30 transition-all duration-300 group hover:-translate-y-1">
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="w-12 h-12 bg-emerald-600/10 border border-emerald-600/20 text-emerald-400 rounded-xl flex items-center justify-center">
+                      <Camera className="w-6 h-6" />
+                    </div>
+                    <span className="text-3xl font-black text-slate-800 group-hover:text-emerald-500/20 transition-colors">01</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">1. Haz una foto al ticket</h3>
+                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
+                    Sube tu recibo de compra. Nuestra IA Gemini lee los productos y rellena tu inventario automáticamente en segundos.
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2">Escáner de Tickets Multimodal</h3>
-                <p className="text-xs sm:text-sm text-slate-450 leading-relaxed text-slate-450">
-                  ¿Has vuelto de la compra? Hazle una foto al ticket. Nuestro motor Gemini extrae automáticamente los productos, cantidades y unidades, categorizando tu despensa sin esfuerzo manual.
-                </p>
+                
+                {/* Visual mock for step 1 */}
+                <div className="bg-slate-900/60 rounded-2xl p-4 border border-slate-800/60 font-mono text-[9px] relative overflow-hidden h-28 flex flex-col justify-between">
+                  <div className="absolute inset-x-0 top-0 h-0.5 bg-emerald-500/60 animate-scanline" />
+                  <div className="text-slate-500 text-center tracking-wider">--- COMPRA PROCESADA ---</div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-slate-300"><span>🧀 QUESO FRESCO</span><span className="text-emerald-400 font-bold">+1 ud</span></div>
+                    <div className="flex justify-between text-slate-300"><span>🍌 PLÁTANOS</span><span className="text-emerald-400 font-bold">+6 uds</span></div>
+                  </div>
+                  <div className="bg-emerald-950/60 text-emerald-400 font-sans font-bold text-[9px] px-2 py-1 rounded text-center border border-emerald-900/50">
+                    2 ingredientes añadidos con éxito
+                  </div>
+                </div>
               </div>
 
-              {/* Feature 2 */}
-              <div className="bg-slate-850/40 border border-slate-800/80 rounded-2xl p-6 hover:shadow-lg hover:border-slate-700/60 transition-all duration-300 hover:-translate-y-1">
-                <div className="w-12 h-12 bg-amber-600/10 border border-amber-600/20 text-amber-400 rounded-xl flex items-center justify-center mb-6">
-                  <Sparkles className="w-6 h-6" />
+              {/* Paso 2 */}
+              <div className="bg-slate-850/40 border border-slate-800/80 rounded-3xl p-6 flex flex-col justify-between hover:border-amber-500/30 transition-all duration-300 group hover:-translate-y-1">
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="w-12 h-12 bg-amber-600/10 border border-amber-600/20 text-amber-400 rounded-xl flex items-center justify-center">
+                      <Sparkles className="w-6 h-6" />
+                    </div>
+                    <span className="text-3xl font-black text-slate-800 group-hover:text-amber-500/20 transition-colors">02</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">2. Obtén recetas y planifica</h3>
+                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
+                    La IA te propone recetas según tus gustos, alergias e ingredientes en stock. Agéndalas en tu calendario semanal.
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2">Chef IA Personalizado</h3>
-                <p className="text-xs sm:text-sm text-slate-450 leading-relaxed text-slate-450">
-                  No pienses más qué hacer de cenar. Selecciona qué ingredientes de tu despensa quieres consumir y Gemini diseñará una receta deliciosa detallando calorías, macros e instrucciones precisas.
-                </p>
+                
+                {/* Visual mock for step 2 */}
+                <div className="bg-slate-900/60 rounded-2xl p-4 border border-slate-800/60 h-28 flex flex-col justify-between">
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-slate-400 font-bold font-sans">📅 Lunes (Comida)</span>
+                    <span className="text-amber-400 bg-amber-950/60 border border-amber-900/50 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-wider">Gemini</span>
+                  </div>
+                  <div className="bg-slate-850 p-2.5 rounded-xl border border-slate-750 flex items-center justify-between">
+                    <div>
+                      <h4 className="text-[10px] font-bold text-white leading-tight">Ensalada de Queso y Plátano</h4>
+                      <p className="text-[8px] text-slate-500 font-mono mt-0.5">Usa Queso y Plátano de tu stock</p>
+                    </div>
+                    <span className="text-xs">🥗</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Feature 3 */}
-              <div className="bg-slate-850/40 border border-slate-800/80 rounded-2xl p-6 hover:shadow-lg hover:border-slate-700/60 transition-all duration-300 hover:-translate-y-1">
-                <div className="w-12 h-12 bg-teal-600/10 border border-teal-600/20 text-teal-400 rounded-xl flex items-center justify-center mb-6">
-                  <Calendar className="w-6 h-6" />
+              {/* Paso 3 */}
+              <div className="bg-slate-850/40 border border-slate-800/80 rounded-3xl p-6 flex flex-col justify-between hover:border-teal-500/30 transition-all duration-300 group hover:-translate-y-1">
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="w-12 h-12 bg-teal-600/10 border border-teal-600/20 text-teal-400 rounded-xl flex items-center justify-center">
+                      <Calendar className="w-6 h-6" />
+                    </div>
+                    <span className="text-3xl font-black text-slate-800 group-hover:text-teal-500/20 transition-colors">03</span>
+                  </div>
+                  <h3 className="text-lg font-bold text-white mb-2">3. Cocina y resta stock</h3>
+                  <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
+                    Sigue la receta paso a paso. Al terminar, la app descuenta automáticamente del inventario las cantidades reales consumidas.
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-white mb-2">Planificador & Cocina Live</h3>
-                <p className="text-xs sm:text-sm text-slate-450 leading-relaxed text-slate-450">
-                  Planifica tu menú por adelantado. Al cocinar, sigue las instrucciones paso a paso con temporizadores inteligentes y deja que la aplicación descuente automáticamente las raciones reales de tu stock.
-                </p>
+                
+                {/* Visual mock for step 3 */}
+                <div className="bg-slate-900/60 rounded-2xl p-4 border border-slate-800/60 h-28 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[9px] text-slate-400 font-semibold font-sans">Cocina en Vivo 👨‍🍳</span>
+                    <span className="text-[8px] bg-emerald-950 text-emerald-400 font-mono px-1.5 py-0.5 rounded border border-emerald-900/50">¡Completado!</span>
+                  </div>
+                  <div className="text-center py-1">
+                    <span className="text-[9px] font-mono text-slate-500 block">DESCONTANDO STOCK...</span>
+                    <span className="text-[10px] font-black text-rose-400">-1 ud Queso  •  -1 ud Plátano</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
