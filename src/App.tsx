@@ -88,6 +88,13 @@ const ALLERGY_OPTIONS = [
   { id: "FrutosSecos", label: "Frutos Secos", emoji: "🥜" },
   { id: "Huevo", label: "Sin Huevo", emoji: "🥚" },
   { id: "Mariscos", label: "Mariscos", emoji: "🦐" },
+  { id: "Pescado", label: "Sin Pescado", emoji: "🐟" },
+  { id: "Soja", label: "Sin Soja", emoji: "🌱" },
+  { id: "Apio", label: "Sin Apio", emoji: "🥬" },
+  { id: "Mostaza", label: "Sin Mostaza", emoji: "🌭" },
+  { id: "Sesamo", label: "Sin Sésamo", emoji: "🥯" },
+  { id: "Altramuces", label: "Altramuces", emoji: "🌰" },
+  { id: "Moluscos", label: "Moluscos", emoji: "🐙" },
   { id: "Vegano", label: "Vegano", emoji: "🥗" },
   { id: "Vegetariano", label: "Vegetariano", emoji: "🥕" },
   { id: "Keto", label: "Dieta Keto", emoji: "🥩" }
@@ -353,14 +360,35 @@ export default function App() {
   };
   // --- CONTROLADOR ONBOARDING / CONFIGURACIÓN DE PERFIL ---
   const [selectedOnboardingAllergies, setSelectedOnboardingAllergies] = useState<string[]>([]);
+  const [customOnboardingAllergies, setCustomOnboardingAllergies] = useState<string>("");
   const [selectedOnboardingStyle, setSelectedOnboardingStyle] = useState<string>("Saludable y Fitness");
   const [selectedOnboardingStaples, setSelectedOnboardingStaples] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (showOnboardingModal) {
+      const predefinedIds = ALLERGY_OPTIONS.map(opt => opt.id);
+      const predefinedSelected = profilePrefs.allergies.filter(id => predefinedIds.includes(id));
+      const customSelected = profilePrefs.allergies.filter(id => !predefinedIds.includes(id)).join(", ");
+      
+      setSelectedOnboardingAllergies(predefinedSelected);
+      setCustomOnboardingAllergies(customSelected);
+      setSelectedOnboardingStyle(profilePrefs.cookingStyle);
+      setSelectedOnboardingStaples([]);
+    }
+  }, [showOnboardingModal, profilePrefs]);
 
   const handleSaveOnboarding = async () => {
     setLoading(true);
     try {
+      const customParsed = customOnboardingAllergies
+        .split(",")
+        .map(x => x.trim())
+        .filter(x => x.length > 0);
+
+      const finalAllergies = [...selectedOnboardingAllergies, ...customParsed];
+
       const payloadPrefs = {
-        allergies: selectedOnboardingAllergies,
+        allergies: finalAllergies,
         preferences: [],
         cookingStyle: selectedOnboardingStyle
       };
@@ -368,7 +396,7 @@ export default function App() {
       if (session?.user) {
         const { error: authError } = await supabase.auth.updateUser({
           data: {
-            allergies: selectedOnboardingAllergies,
+            allergies: finalAllergies,
             preferences: [],
             cookingStyle: selectedOnboardingStyle,
             setup_completed: true
@@ -3485,6 +3513,23 @@ export default function App() {
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Alérgenos e intolerancias personalizadas */}
+                <div className="space-y-2 border-t border-slate-100 pt-4 text-left">
+                  <label className="text-xs font-bold text-slate-700 block uppercase tracking-wider">
+                    Otros alérgenos o restricciones personalizadas
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: fresas, cebolla, ajo, piña (separados por comas)"
+                    value={customOnboardingAllergies}
+                    onChange={(e) => setCustomOnboardingAllergies(e.target.value)}
+                    className="w-full bg-white border border-slate-250 rounded-xl p-3 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-slate-800 placeholder-slate-400 font-sans"
+                  />
+                  <p className="text-[10px] text-slate-400 leading-normal font-sans">
+                    Escribe cualquier ingrediente adicional que quieras excluir. Gemini Chef los eliminará de las sugerencias.
+                  </p>
                 </div>
               </div>
             )}
