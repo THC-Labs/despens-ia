@@ -18,9 +18,11 @@ const runtimeDirname = typeof __dirname !== "undefined"
 const dbPath = path.join(runtimeDirname, "db.json");
 
 // Inicializar el cliente del SDK de Google GenAI en el servidor
-// con la cabecera correspondiente requerida por AI Studio Build
+// con la cabecera correspondiente requerida por AI Studio Build.
+// Usamos un placeholder seguro en caso de que la clave no esté configurada para evitar colapsar al iniciar el servidor.
+const rawApiKey = process.env.GEMINI_API_KEY || "";
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
+  apiKey: rawApiKey || "MISSING_GEMINI_API_KEY",
   httpOptions: {
     headers: {
       "User-Agent": "aistudio-build",
