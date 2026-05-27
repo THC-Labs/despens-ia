@@ -530,6 +530,8 @@ export default function App() {
   const [chefExtraPrompt, setChefExtraPrompt] = useState("");
   const [generatingRecipe, setGeneratingRecipe] = useState(false);
   const [generatedRecipeDraft, setGeneratedRecipeDraft] = useState<any | null>(null);
+  const [chefSearchQuery, setChefSearchQuery] = useState("");
+  const [showChefSearchDropdown, setShowChefSearchDropdown] = useState(false);
 
   // --- IMPORTADOR DE RECETAS ---
   const [showRecipeImporter, setShowRecipeImporter] = useState(false);
@@ -2946,16 +2948,97 @@ export default function App() {
                 </div>
 
                 {/* Selección interactiva flotante de ingredientes */}
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <span className="text-xs font-bold text-slate-200 block uppercase tracking-wider">Ingrediente(s) asignados para recetar ({selectedForRecipe.length})</span>
+                  
+                  {/* Selector y buscador inline de alimentos */}
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-200" />
+                        <input
+                          type="text"
+                          placeholder="Buscar o escribir ingrediente..."
+                          value={chefSearchQuery}
+                          onChange={(e) => {
+                            setChefSearchQuery(e.target.value);
+                            setShowChefSearchDropdown(true);
+                          }}
+                          onFocus={() => setShowChefSearchDropdown(true)}
+                          onBlur={() => setTimeout(() => setShowChefSearchDropdown(false), 200)}
+                          className="w-full pl-9 pr-4 py-2.5 bg-white/10 placeholder-emerald-200/75 border border-white/25 border-emerald-400 rounded-xl text-xs focus:outline-none focus:bg-white/20 focus:ring-1 focus:ring-emerald-400 transition-all text-white font-medium"
+                        />
+                      </div>
+                      {chefSearchQuery.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = chefSearchQuery.trim();
+                            if (!selectedForRecipe.some(s => s.toLowerCase() === val.toLowerCase())) {
+                              setSelectedForRecipe(prev => [...prev, val]);
+                            }
+                            setChefSearchQuery("");
+                          }}
+                          className="bg-white hover:bg-emerald-50 text-emerald-800 font-extrabold text-xs px-4 py-2.5 rounded-xl transition-all cursor-pointer shadow-xs active:scale-95 flex-shrink-0"
+                        >
+                          Añadir Custom
+                        </button>
+                      )}
+                    </div>
+
+                    {showChefSearchDropdown && (
+                      <div className="absolute left-0 right-0 mt-1.5 max-h-60 overflow-y-auto bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-20 divide-y divide-slate-750/50">
+                        {(() => {
+                          const filtered = activeInventory.filter(item => {
+                            const alreadySelected = selectedForRecipe.some(sel => sel.toLowerCase() === item.name.toLowerCase());
+                            const matchesQuery = item.name.toLowerCase().includes(chefSearchQuery.toLowerCase());
+                            return !alreadySelected && matchesQuery;
+                          });
+
+                          return (
+                            <>
+                              {filtered.length > 0 ? (
+                                filtered.map(item => (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => {
+                                      if (!selectedForRecipe.includes(item.name)) {
+                                        setSelectedForRecipe(prev => [...prev, item.name]);
+                                      }
+                                      setChefSearchQuery("");
+                                    }}
+                                    className="w-full text-left px-4 py-3 hover:bg-slate-700/60 text-slate-100 text-xs font-semibold flex items-center justify-between transition-colors"
+                                  >
+                                    <span className="flex items-center gap-1.5">
+                                      <Warehouse className="w-3.5 h-3.5 text-slate-400" />
+                                      {item.name}
+                                    </span>
+                                    <span className="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded-full font-bold">
+                                      {item.quantity} {item.unit}
+                                    </span>
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="px-4 py-3 text-slate-400 text-xs italic">
+                                  {chefSearchQuery.trim() ? "No se encontraron otros ingredientes en stock" : "Escribe para buscar ingredientes de tu despensa..."}
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
                   {selectedForRecipe.length === 0 ? (
-                    <p className="text-xs text-emerald-200">⚠️ Ningún ingrediente seleccionado. Ve a la pestaña Despensa y marca las casillas de verificación correspondientes o selecciona todos.</p>
+                    <p className="text-xs text-emerald-200">⚠️ Ningún ingrediente seleccionado. Busca arriba o escribe para añadir alimentos personalizados para tu receta.</p>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 pt-1">
                       {selectedForRecipe.map(name => (
-                        <span key={name} className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full flex items-center gap-1 font-semibold transition-colors">
+                        <span key={name} className="text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full flex items-center gap-1.5 font-semibold transition-colors">
                           {name}
-                          <button onClick={() => toggleSelectForRecipe(name)} className="text-emerald-300 hover:text-white">×</button>
+                          <button onClick={() => toggleSelectForRecipe(name)} className="text-emerald-300 hover:text-white text-sm font-extrabold focus:outline-none">×</button>
                         </span>
                       ))}
                     </div>
