@@ -1165,10 +1165,19 @@ export default function App() {
     setGeneratedRecipeDraft(null);
 
     try {
-      // Filtrar alimentos completos que están seleccionados
-      const itemsSelected = activeInventory
-        .filter(it => selectedForRecipe.includes(it.name))
-        .map(it => ({ name: it.name, quantity: it.quantity, unit: it.unit }));
+      // Filtrar alimentos completos que están seleccionados (incluyendo personalizados)
+      const itemsSelected = selectedForRecipe.map(name => {
+        const inventoryItem = activeInventory.find(it => it.name.toLowerCase() === name.toLowerCase());
+        return inventoryItem ? {
+          name: inventoryItem.name,
+          quantity: inventoryItem.quantity,
+          unit: inventoryItem.unit
+        } : {
+          name: name,
+          quantity: 0,
+          unit: ""
+        };
+      });
 
       const res = await fetch("/api/gemini/recipe", {
         method: "POST",
@@ -1220,7 +1229,6 @@ export default function App() {
             ingredients_required: generatedRecipeDraft.ingredients_required,
             instructions: generatedRecipeDraft.instructions,
             macros_summary: generatedRecipeDraft.macros_summary,
-            likes: 0,
             user_id: session.user.id,
             created_at: new Date().toISOString()
           });
