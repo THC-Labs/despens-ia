@@ -156,6 +156,26 @@ app.delete("/api/inventory/:id", (req, res) => {
   res.json({ success: true });
 });
 
+app.post("/api/inventory/bulk", (req, res) => {
+  const db = readDb();
+  const items = req.body.items || [];
+  const addedItems = [];
+  for (const item of items) {
+    const newItem = {
+      id: Math.random().toString(36).substring(2, 9),
+      name: item.name,
+      quantity: parseFloat(item.quantity) || 0,
+      unit: item.unit || "uds",
+      category: item.category || "Otros",
+      last_updated: new Date().toISOString()
+    };
+    db.inventory.push(newItem);
+    addedItems.push(newItem);
+  }
+  writeDb(db);
+  res.json(addedItems);
+});
+
 
 // ==========================================
 // RUTA REST API: RECETAS (recipes)
@@ -243,16 +263,24 @@ app.delete("/api/meal-plan/:id", (req, res) => {
 // RUTA DE IA: GENERAR RECETA CON GEMINI
 // ==========================================
 app.post("/api/gemini/recipe", async (req, res) => {
-  const { selectedIngredients, extraPrompt } = req.body;
+  const { selectedIngredients, extraPrompt, allergies, preferences, cookingStyle } = req.body;
   if (!selectedIngredients || selectedIngredients.length === 0) {
     return res.status(400).json({ error: "No seleccionaste ningún ingrediente de tu despensa." });
   }
 
   const ingredientsListStr = selectedIngredients.map((item: any) => `- ${item.name} (${item.quantity} ${item.unit})`).join("\n");
+  const allergiesStr = allergies && allergies.length > 0 ? allergies.join(", ") : "Ninguna";
+  const preferencesStr = preferences && preferences.length > 0 ? preferences.join(", ") : "Ninguna";
+  const cookingStyleStr = cookingStyle || "Saludable y Balanceada";
 
   const prompt = `Actúa como un chef profesional y diseñador de planes alimenticios saludables.
 Tengo los siguientes ingredientes disponibles en mi despensa:
 ${ingredientsListStr}
+
+Restricciones y Preferencias de Salud/Dieta del Usuario:
+- Alergias/Intolerancias alimenticias: ${allergiesStr}. EXCLUYE estrictamente estos alérgenos e intolerancias de la receta.
+- Preferencias de gustos/ingredientes: ${preferencesStr}.
+- Estilo de cocina deseado: ${cookingStyleStr}.
 
 ${extraPrompt ? `Instrucciones o preferencias adicionales del usuario: "${extraPrompt}"` : ""}
 

@@ -82,6 +82,49 @@ const SAMPLE_TICKET_CARREFOUR = {
   ]
 };
 
+const ALLERGY_OPTIONS = [
+  { id: "Gluten", label: "Sin Gluten", emoji: "🌾" },
+  { id: "Lactosa", label: "Sin Lactosa", emoji: "🥛" },
+  { id: "FrutosSecos", label: "Frutos Secos", emoji: "🥜" },
+  { id: "Huevo", label: "Sin Huevo", emoji: "🥚" },
+  { id: "Mariscos", label: "Mariscos", emoji: "🦐" },
+  { id: "Vegano", label: "Vegano", emoji: "🥗" },
+  { id: "Vegetariano", label: "Vegetariano", emoji: "🥕" },
+  { id: "Keto", label: "Dieta Keto", emoji: "🥩" }
+];
+
+const STYLE_OPTIONS = [
+  { id: "Rápida y Fácil", label: "Rápida y Fácil (< 20 min)", desc: "Platos rápidos con pocos ingredientes", emoji: "⚡" },
+  { id: "Saludable y Fitness", label: "Saludable y Fitness", desc: "Platos balanceados, control de macros", emoji: "🥗" },
+  { id: "Familiar y Tradicional", label: "Familiar y Tradicional", desc: "Guisos, guarniciones y cocina clásica", emoji: "🍳" },
+  { id: "Gourmet y Creativo", label: "Gourmet y Creativo", desc: "Platos elaborados con técnicas culinarias", emoji: "👨‍🍳" }
+];
+
+const BASIC_INGREDIENT_OPTIONS = [
+  // Condimentos
+  { name: "Aceite de Oliva", quantity: 1000, unit: "ml", category: "Condimentos", categoryGroup: "Especias & Aceites" },
+  { name: "Sal", quantity: 500, unit: "g", category: "Condimentos", categoryGroup: "Especias & Aceites" },
+  { name: "Pimienta Negra", quantity: 100, unit: "g", category: "Condimentos", categoryGroup: "Especias & Aceites" },
+  { name: "Ajo en Polvo", quantity: 100, unit: "g", category: "Condimentos", categoryGroup: "Especias & Aceites" },
+  { name: "Orégano seco", quantity: 80, unit: "g", category: "Condimentos", categoryGroup: "Especias & Aceites" },
+  { name: "Vinagre", quantity: 500, unit: "ml", category: "Condimentos", categoryGroup: "Especias & Aceites" },
+  
+  // Secos
+  { name: "Arroz Integral", quantity: 1000, unit: "g", category: "Granos/Cereales", categoryGroup: "Granos & Secos" },
+  { name: "Pasta de Trigo", quantity: 500, unit: "g", category: "Granos/Cereales", categoryGroup: "Granos & Secos" },
+  { name: "Harina de Trigo", quantity: 1000, unit: "g", category: "Granos/Cereales", categoryGroup: "Granos & Secos" },
+  { name: "Avena en copos", quantity: 500, unit: "g", category: "Granos/Cereales", categoryGroup: "Granos & Secos" },
+  { name: "Café molido", quantity: 250, unit: "g", category: "Otros", categoryGroup: "Granos & Secos" },
+  { name: "Azúcar", quantity: 500, unit: "g", category: "Otros", categoryGroup: "Granos & Secos" },
+  
+  // Frescos
+  { name: "Huevos Orgánicos", quantity: 12, unit: "uds", category: "Lácteos/Huevos", categoryGroup: "Frescos Básicos" },
+  { name: "Cebollas", quantity: 4, unit: "uds", category: "Verduras/Frutas", categoryGroup: "Frescos Básicos" },
+  { name: "Ajos", quantity: 3, unit: "uds", category: "Verduras/Frutas", categoryGroup: "Frescos Básicos" },
+  { name: "Patatas", quantity: 1000, unit: "g", category: "Verduras/Frutas", categoryGroup: "Frescos Básicos" },
+  { name: "Limón", quantity: 3, unit: "uds", category: "Verduras/Frutas", categoryGroup: "Frescos Básicos" }
+];
+
 export default function App() {
   // Pestañas principal: 'pantry' | 'recipes' | 'planner'
   const [activeTab, setActiveTab] = useState<"pantry" | "recipes" | "planner">("pantry");
@@ -100,6 +143,17 @@ export default function App() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [authLoading, setAuthLoading] = useState(false);
   const [guestMode, setGuestMode] = useState(false);
+  const [profilePrefs, setProfilePrefs] = useState<{
+    allergies: string[];
+    preferences: string[];
+    cookingStyle: string;
+  }>({
+    allergies: [],
+    preferences: [],
+    cookingStyle: "Saludable y Balanceada"
+  });
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState(1);
 
   // Estado del cargador general
   const [loading, setLoading] = useState(false);
@@ -175,6 +229,48 @@ export default function App() {
   useEffect(() => {
     fetchData();
   }, [session]);
+
+  useEffect(() => {
+    if (session?.user) {
+      const metadata = session.user.user_metadata;
+      if (metadata) {
+        setProfilePrefs({
+          allergies: metadata.allergies || [],
+          preferences: metadata.preferences || [],
+          cookingStyle: metadata.cookingStyle || "Saludable y Balanceada"
+        });
+        if (!metadata.setup_completed) {
+          setShowOnboardingModal(true);
+          setOnboardingStep(1);
+        } else {
+          setShowOnboardingModal(false);
+        }
+      }
+    } else if (guestMode) {
+      const localPrefsStr = localStorage.getItem("despensia_prefs");
+      if (localPrefsStr) {
+        try {
+          const parsed = JSON.parse(localPrefsStr);
+          setProfilePrefs({
+            allergies: parsed.allergies || [],
+            preferences: parsed.preferences || [],
+            cookingStyle: parsed.cookingStyle || "Saludable y Balanceada"
+          });
+        } catch (e) {
+          console.error("Error parsing local preferences", e);
+        }
+      }
+      const setupCompleted = localStorage.getItem("despensia_setup_completed") === "true";
+      if (!setupCompleted) {
+        setShowOnboardingModal(true);
+        setOnboardingStep(1);
+      } else {
+        setShowOnboardingModal(false);
+      }
+    } else {
+      setShowOnboardingModal(false);
+    }
+  }, [session, guestMode]);
 
   const fetchData = async () => {
     try {
@@ -253,6 +349,84 @@ export default function App() {
       triggerAlert("error", "Fallo de autenticación: " + (err.message || err.toString()));
     } finally {
       setAuthLoading(false);
+    }
+  };
+  // --- CONTROLADOR ONBOARDING / CONFIGURACIÓN DE PERFIL ---
+  const [selectedOnboardingAllergies, setSelectedOnboardingAllergies] = useState<string[]>([]);
+  const [selectedOnboardingStyle, setSelectedOnboardingStyle] = useState<string>("Saludable y Fitness");
+  const [selectedOnboardingStaples, setSelectedOnboardingStaples] = useState<string[]>([]);
+
+  const handleSaveOnboarding = async () => {
+    setLoading(true);
+    try {
+      const payloadPrefs = {
+        allergies: selectedOnboardingAllergies,
+        preferences: [],
+        cookingStyle: selectedOnboardingStyle
+      };
+
+      if (session?.user) {
+        const { error: authError } = await supabase.auth.updateUser({
+          data: {
+            allergies: selectedOnboardingAllergies,
+            preferences: [],
+            cookingStyle: selectedOnboardingStyle,
+            setup_completed: true
+          }
+        });
+        if (authError) throw authError;
+      } else {
+        localStorage.setItem("despensia_prefs", JSON.stringify(payloadPrefs));
+        localStorage.setItem("despensia_setup_completed", "true");
+      }
+
+      const staplesToInsert = BASIC_INGREDIENT_OPTIONS
+        .filter(item => selectedOnboardingStaples.includes(item.name))
+        .map(item => {
+          if (session?.user) {
+            return {
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              category: item.category,
+              user_id: session.user.id,
+              last_updated: new Date().toISOString()
+            };
+          } else {
+            return {
+              name: item.name,
+              quantity: item.quantity,
+              unit: item.unit,
+              category: item.category
+            };
+          }
+        });
+
+      if (staplesToInsert.length > 0) {
+        if (session?.user) {
+          const { error: dbError } = await supabase
+            .from("inventory")
+            .insert(staplesToInsert);
+          if (dbError) throw dbError;
+        } else {
+          const res = await fetch("/api/inventory/bulk", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ items: staplesToInsert })
+          });
+          if (!res.ok) throw new Error("Fallo al registrar ingredientes en lote.");
+        }
+      }
+
+      setProfilePrefs(payloadPrefs);
+      triggerAlert("success", "¡Perfil configurado y despensa inicial cargada con éxito!");
+      setShowOnboardingModal(false);
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      triggerAlert("error", "Error al guardar perfil: " + (err.message || err.toString()));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -605,7 +779,10 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           selectedIngredients: itemsSelected,
-          extraPrompt: chefExtraPrompt
+          extraPrompt: chefExtraPrompt,
+          allergies: profilePrefs.allergies,
+          preferences: profilePrefs.preferences,
+          cookingStyle: profilePrefs.cookingStyle
         })
       });
 
@@ -1734,6 +1911,22 @@ export default function App() {
                 >
                   <Camera className="w-4 h-4 text-emerald-600" />
                   Escanear Ticket 📸
+                </button>
+
+                {/* Botón Asistente de Perfil / Carga Rápida */}
+                <button
+                  onClick={() => {
+                    setSelectedOnboardingAllergies(profilePrefs.allergies);
+                    setSelectedOnboardingStyle(profilePrefs.cookingStyle);
+                    setSelectedOnboardingStaples([]);
+                    setOnboardingStep(1);
+                    setShowOnboardingModal(true);
+                  }}
+                  className="bg-slate-800 text-slate-100 hover:bg-slate-700 font-bold text-sm py-2.5 px-4 rounded-lg flex items-center gap-2 border border-slate-700 shadow-3xs transition-all active:scale-95 cursor-pointer"
+                  title="Configurar alergias, gustos y carga masiva de ingredientes"
+                >
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  Ajustes Perfil ⭐
                 </button>
 
                 {/* Botón añadir alimento manual */}
@@ -3011,6 +3204,213 @@ export default function App() {
             )}
           </div>
         </div>
+      )}
+      {/* MODAL DE CONFIGURACIÓN DE PERFIL Y ONBOARDING */}
+      {showOnboardingModal && (
+        <div id="onboarding-modal-overlay" className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 border border-slate-100 shadow-2xl relative animate-fade-in text-left">
+            <button
+              onClick={() => {
+                if (confirm("¿Estás seguro de que deseas cerrar el asistente? Puedes abrirlo en cualquier momento desde la Despensa.")) {
+                  setShowOnboardingModal(false);
+                }
+              }}
+              className="absolute top-4 right-4 text-slate-450 hover:text-slate-700 text-sm font-black p-1 hover:bg-slate-50 rounded-full cursor-pointer"
+              title="Cerrar asistente"
+            >
+              ✕
+            </button>
+
+            {/* Stepper Header */}
+            <div className="mb-6 pb-4 border-b border-slate-100">
+              <h3 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-emerald-600 animate-spin" />
+                Asistente de Bienvenida de Despensia
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">Configura tu dieta y reabastece tu despensa inicial en 3 sencillos pasos.</p>
+              
+              {/* Step indicator */}
+              <div className="flex gap-2 mt-4">
+                {[1, 2, 3].map((step) => (
+                  <div 
+                    key={step}
+                    className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${
+                      onboardingStep >= step ? "bg-emerald-600" : "bg-slate-100"
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="flex justify-between text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1.5 font-mono">
+                <span className={onboardingStep === 1 ? "text-emerald-700 font-extrabold" : "text-slate-400"}>1. Alergias</span>
+                <span className={onboardingStep === 2 ? "text-emerald-700 font-extrabold" : "text-slate-400"}>2. Estilo Cocina</span>
+                <span className={onboardingStep === 3 ? "text-emerald-700 font-extrabold" : "text-slate-400"}>3. Básicos Despensa</span>
+              </div>
+            </div>
+
+            {/* Step 1: Dieta y Alergias */}
+            {onboardingStep === 1 && (
+              <div className="space-y-4 animate-fade-in">
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-800 font-sans">Paso 1: ¿Tienes alguna restricción o alérgenos?</h4>
+                  <p className="text-xs text-slate-400 mt-0.5 font-sans">El Chef IA de Gemini los excluirá estrictamente al sugerirte recetas.</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {ALLERGY_OPTIONS.map((opt) => {
+                    const isSelected = selectedOnboardingAllergies.includes(opt.id);
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedOnboardingAllergies(prev => 
+                            prev.includes(opt.id) ? prev.filter(x => x !== opt.id) : [...prev, opt.id]
+                          );
+                        }}
+                        className={`p-3 rounded-xl border flex flex-col items-center justify-center text-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                          isSelected 
+                            ? "bg-emerald-50 border-emerald-500 text-emerald-800 shadow-2xs" 
+                            : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="text-xl">{opt.emoji}</span>
+                        <span className="text-xs font-bold leading-tight">{opt.label}</span>
+                        {isSelected && <span className="text-[10px] text-emerald-600 font-black">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Gustos y Estilo de Cocina */}
+            {onboardingStep === 2 && (
+              <div className="space-y-4 animate-fade-in">
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-800 font-sans">Paso 2: ¿Cuál es tu estilo preferido de cocina?</h4>
+                  <p className="text-xs text-slate-400 mt-0.5 font-sans">Ayuda al Chef IA a priorizar sugerencias que se adapten a tu día a día.</p>
+                </div>
+                <div className="space-y-2">
+                  {STYLE_OPTIONS.map((opt) => {
+                    const isSelected = selectedOnboardingStyle === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setSelectedOnboardingStyle(opt.id)}
+                        className={`w-full p-4 rounded-xl border flex items-center justify-between text-left cursor-pointer transition-all active:scale-99 ${
+                          isSelected 
+                            ? "bg-emerald-50/70 border-emerald-500 text-emerald-950 shadow-2xs" 
+                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl p-2 bg-slate-100 rounded-lg">{opt.emoji}</span>
+                          <div>
+                            <p className="text-xs font-black text-slate-850 font-sans">{opt.label}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5 font-medium font-sans">{opt.desc}</p>
+                          </div>
+                        </div>
+                        <input 
+                          type="radio" 
+                          checked={isSelected} 
+                          onChange={() => {}} 
+                          className="accent-emerald-600 w-4 h-4 cursor-pointer" 
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Básicos Despensa */}
+            {onboardingStep === 3 && (
+              <div className="space-y-4 animate-fade-in">
+                <div>
+                  <h4 className="font-extrabold text-sm text-slate-800 font-sans">Paso 3: Carga rápida de tu despensa</h4>
+                  <p className="text-xs text-slate-400 mt-0.5 font-sans">Marca los ingredientes que sueles tener en casa para añadirlos todos de una sola vez.</p>
+                </div>
+                
+                <div className="max-h-60 overflow-y-auto space-y-4 pr-1.5">
+                  {["Especias & Aceites", "Granos & Secos", "Frescos Básicos"].map((groupName) => {
+                    const groupItems = BASIC_INGREDIENT_OPTIONS.filter(x => x.categoryGroup === groupName);
+                    return (
+                      <div key={groupName} className="space-y-2">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block font-mono">{groupName}</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {groupItems.map((item) => {
+                            const isChecked = selectedOnboardingStaples.includes(item.name);
+                            return (
+                              <button
+                                key={item.name}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedOnboardingStaples(prev => 
+                                    prev.includes(item.name) ? prev.filter(x => x !== item.name) : [...prev, item.name]
+                                  );
+                                }}
+                                className={`p-2.5 rounded-xl border flex items-center justify-between text-left cursor-pointer transition-all active:scale-98 text-xs font-bold ${
+                                  isChecked 
+                                    ? "bg-emerald-50 border-emerald-300 text-emerald-800" 
+                                    : "bg-white border-slate-150 text-slate-600 hover:bg-slate-50"
+                                }`}
+                              >
+                                <span className="truncate">{item.name}</span>
+                                <span className="bg-slate-100 text-slate-500 font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md flex-shrink-0">
+                                  {item.quantity}{item.unit}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Stepper Footer Controls */}
+            <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-center">
+              <button
+                type="button"
+                disabled={onboardingStep === 1 || loading}
+                onClick={() => setOnboardingStep(prev => prev - 1)}
+                className="text-xs font-bold text-slate-400 hover:text-slate-655 disabled:opacity-50 uppercase tracking-wider py-2 px-3 cursor-pointer"
+              >
+                Atrás
+              </button>
+
+              {onboardingStep < 3 ? (
+                <button
+                  type="button"
+                  onClick={() => setOnboardingStep(prev => prev + 1)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2.5 px-6 rounded-xl shadow-md uppercase tracking-wider active:scale-95 transition-all cursor-pointer animate-fade-in"
+                >
+                  Siguiente paso
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={handleSaveOnboarding}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2.5 px-6 rounded-xl shadow-md uppercase tracking-wider active:scale-95 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  {loading ? (
+                    <RefreshCw className="animate-spin w-3.5 h-3.5" />
+                  ) : (
+                    "Finalizar y Guardar"
+                  )}
+                </button>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
+      
+      {guestMode && (
+        <div className="hidden" /> // placeholder
       )}
 
     </div>
