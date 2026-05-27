@@ -39,7 +39,10 @@ import {
   Lock,
   User,
   Mail,
-  Smartphone
+  Smartphone,
+  Warehouse,
+  ChevronDown,
+  Settings
 } from "lucide-react";
 
 // Categorías del inventario
@@ -132,6 +135,217 @@ const BASIC_INGREDIENT_OPTIONS = [
   { name: "Limón", quantity: 3, unit: "uds", category: "Verduras/Frutas", categoryGroup: "Frescos Básicos" }
 ];
 
+// Mapas de temas de colores
+const themeColorMaps: Record<string, {
+  primary: string;
+  hover: string;
+  active: string;
+  light: string;
+  border: string;
+  borderLight: string;
+  darkText: string;
+  ultraDarkText: string;
+  badgeBg: string;
+  badgeText: string;
+  glow500: string;
+  accent: string;
+  fromGrad: string;
+  toGrad: string;
+  fromGradLight: string;
+  toGradLight: string;
+  textSparkle: string;
+  bgDarkBadge: string;
+  borderDarkBadge: string;
+  textDarkBadge: string;
+  shadowColor: string;
+}> = {
+  emerald: {
+    primary: "#059669",
+    hover: "#10b981",
+    active: "#047857",
+    light: "#ecfdf5",
+    border: "#10b981",
+    borderLight: "#d1fae5",
+    darkText: "#065f46",
+    ultraDarkText: "#022c22",
+    badgeBg: "#d1fae5",
+    badgeText: "#065f46",
+    glow500: "#10b981",
+    accent: "#059669",
+    fromGrad: "#059669",
+    toGrad: "#0f766e",
+    fromGradLight: "#34d399",
+    toGradLight: "#5eead4",
+    textSparkle: "#34d399",
+    bgDarkBadge: "#022c22",
+    borderDarkBadge: "#065f46",
+    textDarkBadge: "#34d399",
+    shadowColor: "6, 95, 70"
+  },
+  amber: {
+    primary: "#d97706",
+    hover: "#f59e0b",
+    active: "#b45309",
+    light: "#fffbeb",
+    border: "#f59e0b",
+    borderLight: "#fef3c7",
+    darkText: "#92400e",
+    ultraDarkText: "#451a03",
+    badgeBg: "#fef3c7",
+    badgeText: "#92400e",
+    glow500: "#f59e0b",
+    accent: "#d97706",
+    fromGrad: "#d97706",
+    toGrad: "#c2410c",
+    fromGradLight: "#fbbf24",
+    toGradLight: "#fde047",
+    textSparkle: "#fbbf24",
+    bgDarkBadge: "#451a03",
+    borderDarkBadge: "#92400e",
+    textDarkBadge: "#fbbf24",
+    shadowColor: "146, 64, 14"
+  },
+  rose: {
+    primary: "#e11d48",
+    hover: "#f43f5e",
+    active: "#be123c",
+    light: "#fff1f2",
+    border: "#f43f5e",
+    borderLight: "#ffe4e6",
+    darkText: "#9f1239",
+    ultraDarkText: "#4c0519",
+    badgeBg: "#ffe4e6",
+    badgeText: "#9f1239",
+    glow500: "#f43f5e",
+    accent: "#e11d48",
+    fromGrad: "#e11d48",
+    toGrad: "#be123c",
+    fromGradLight: "#fb7185",
+    toGradLight: "#fca5a5",
+    textSparkle: "#fb7185",
+    bgDarkBadge: "#4c0519",
+    borderDarkBadge: "#9f1239",
+    textDarkBadge: "#fb7185",
+    shadowColor: "159, 18, 57"
+  },
+  indigo: {
+    primary: "#4f46e5",
+    hover: "#6366f1",
+    active: "#3730a3",
+    light: "#eef2ff",
+    border: "#6366f1",
+    borderLight: "#e0e7ff",
+    darkText: "#3730a3",
+    ultraDarkText: "#312e81",
+    badgeBg: "#e0e7ff",
+    badgeText: "#3730a3",
+    glow500: "#6366f1",
+    accent: "#4f46e5",
+    fromGrad: "#4f46e5",
+    toGrad: "#4338ca",
+    fromGradLight: "#818cf8",
+    toGradLight: "#a5b4fc",
+    textSparkle: "#818cf8",
+    bgDarkBadge: "#1e1b4b",
+    borderDarkBadge: "#3730a3",
+    textDarkBadge: "#818cf8",
+    shadowColor: "55, 48, 163"
+  },
+  violet: {
+    primary: "#7c3aed",
+    hover: "#8b5cf6",
+    active: "#6d28d9",
+    light: "#f5f3ff",
+    border: "#8b5cf6",
+    borderLight: "#ede9fe",
+    darkText: "#5b21b6",
+    ultraDarkText: "#2e1065",
+    badgeBg: "#ede9fe",
+    badgeText: "#5b21b6",
+    glow500: "#8b5cf6",
+    accent: "#7c3aed",
+    fromGrad: "#7c3aed",
+    toGrad: "#6d28d9",
+    fromGradLight: "#a78bfa",
+    toGradLight: "#c4b5fd",
+    textSparkle: "#a78bfa",
+    bgDarkBadge: "#2e1065",
+    borderDarkBadge: "#5b21b6",
+    textDarkBadge: "#a78bfa",
+    shadowColor: "91, 33, 182"
+  }
+};
+
+const hexToRgb = (hex: string) => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `${r}, ${g}, ${b}`;
+};
+
+const getThemeStylesheet = (themeName: string) => {
+  const map = themeColorMaps[themeName] || themeColorMaps.emerald;
+  return `
+    /* bg-emerald-600 */
+    .bg-emerald-600 { background-color: ${map.primary} !important; }
+    /* hover:bg-emerald-700 */
+    .hover\\:bg-emerald-700:hover { background-color: ${map.active} !important; }
+    /* hover:bg-emerald-500 */
+    .hover\\:bg-emerald-500:hover { background-color: ${map.hover} !important; }
+    /* bg-emerald-50 */
+    .bg-emerald-50 { background-color: ${map.light} !important; }
+    /* border-emerald-500 */
+    .border-emerald-500 { border-color: ${map.border} !important; }
+    /* border-emerald-100 */
+    .border-emerald-100 { border-color: ${map.borderLight} !important; }
+    /* text-emerald-600 */
+    .text-emerald-600 { color: ${map.primary} !important; }
+    /* text-emerald-700 */
+    .text-emerald-700 { color: ${map.active} !important; }
+    /* text-emerald-800 */
+    .text-emerald-800 { color: ${map.darkText} !important; }
+    /* text-emerald-500 */
+    .text-emerald-500 { color: ${map.hover} !important; }
+    /* text-emerald-400 */
+    .text-emerald-400 { color: ${map.textSparkle} !important; }
+    /* accent-emerald-600 */
+    .accent-emerald-600 { accent-color: ${map.primary} !important; }
+    /* focus:border-emerald-500 */
+    .focus\\:border-emerald-500:focus { border-color: ${map.border} !important; }
+    /* focus:ring-emerald-500 */
+    .focus\\:ring-emerald-500:focus { --tw-ring-color: ${map.border} !important; }
+    /* bg-emerald-100 */
+    .bg-emerald-100 { background-color: ${map.badgeBg} !important; }
+    /* bg-emerald-950 */
+    .bg-emerald-950 { background-color: ${map.bgDarkBadge} !important; }
+    /* border-emerald-800 */
+    .border-emerald-800 { border-color: ${map.borderDarkBadge} !important; }
+    /* border-emerald-900 */
+    .border-emerald-900 { border-color: ${map.borderDarkBadge} !important; }
+    /* text-emerald-900 */
+    .text-emerald-900 { color: ${map.ultraDarkText} !important; }
+    
+    /* Complex/Opacity classes */
+    .bg-emerald-50\\/20 { background-color: rgba(${hexToRgb(map.light)}, 0.2) !important; }
+    .bg-emerald-65 { background-color: rgba(${hexToRgb(map.primary)}, 0.65) !important; }
+    .bg-emerald-600\\/10 { background-color: rgba(${hexToRgb(map.primary)}, 0.1) !important; }
+    .border-emerald-600\\/20 { border-color: rgba(${hexToRgb(map.primary)}, 0.2) !important; }
+    .shadow-emerald-900\\/30 { --tw-shadow-color: rgba(${map.shadowColor}, 0.3) !important; }
+    .shadow-emerald-900\\/10 { --tw-shadow-color: rgba(${map.shadowColor}, 0.1) !important; }
+    .shadow-emerald-200 { --tw-shadow-color: rgba(${hexToRgb(map.primary)}, 0.2) !important; }
+    .bg-emerald-55 { background-color: ${map.light} !important; }
+    .bg-emerald-500\\/10 { background-color: rgba(${hexToRgb(map.hover)}, 0.1) !important; }
+    .bg-emerald-500\\/15 { background-color: rgba(${hexToRgb(map.hover)}, 0.15) !important; }
+    .bg-emerald-500\\/5 { background-color: rgba(${hexToRgb(map.hover)}, 0.05) !important; }
+    .from-emerald-600 { --tw-gradient-from: ${map.primary} !important; --tw-gradient-to: ${map.primary}00 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+    .to-teal-800 { --tw-gradient-to: ${map.toGrad} !important; }
+    .from-emerald-400 { --tw-gradient-from: ${map.fromGradLight} !important; --tw-gradient-to: ${map.fromGradLight}00 !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+    .to-teal-300 { --tw-gradient-to: ${map.toGradLight} !important; }
+    .selection\\:bg-emerald-500 *::selection { background-color: ${map.hover} !important; }
+    .selection\\:bg-emerald-500::selection { background-color: ${map.hover} !important; }
+  `;
+};
+
 export default function App() {
   // Pestañas principal: 'pantry' | 'recipes' | 'planner'
   const [activeTab, setActiveTab] = useState<"pantry" | "recipes" | "planner">("pantry");
@@ -140,6 +354,15 @@ export default function App() {
   const [inventory, setInventory] = useState<any[]>([]);
   const [recipes, setRecipes] = useState<any[]>([]);
   const [mealPlan, setMealPlan] = useState<any[]>([]);
+
+  // --- ESTADOS DE MÚLTIPLES DESPENSAS ---
+  const [pantries, setPantries] = useState<any[]>([
+    { id: "default", name: "Mi Despensa", theme: "emerald" }
+  ]);
+  const [activePantryId, setActivePantryId] = useState<string>("default");
+  const [showPantryModal, setShowPantryModal] = useState<boolean>(false);
+  const [editingPantryId, setEditingPantryId] = useState<string | null>(null);
+  const [pantryForm, setPantryForm] = useState({ name: "", theme: "emerald" });
 
   // --- ESTADOS DE AUTENTICACIÓN Y SINCRONIZACIÓN SUPABASE ---
   const [session, setSession] = useState<any>(null);
@@ -165,6 +388,122 @@ export default function App() {
   // Estado del cargador general
   const [loading, setLoading] = useState(false);
   const [alertMsg, setAlertMsg] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+
+  // --- AUXILIRES DE GESTIÓN DE DESPENSAS ---
+  const parseCategory = (rawCategory: string) => {
+    if (!rawCategory) return { pantryId: "default", category: "Otros" };
+    const idx = rawCategory.indexOf("::");
+    if (idx !== -1) {
+      return {
+        pantryId: rawCategory.substring(0, idx),
+        category: rawCategory.substring(idx + 2)
+      };
+    }
+    return { pantryId: "default", category: rawCategory };
+  };
+
+  const encodeCategory = (pantryId: string, realCategory: string) => {
+    return `${pantryId}::${realCategory}`;
+  };
+
+  const activeInventory = inventory
+    .filter(food => {
+      const { pantryId } = parseCategory(food.category);
+      return pantryId === activePantryId;
+    })
+    .map(food => {
+      const { category } = parseCategory(food.category);
+      return {
+        ...food,
+        category: category
+      };
+    });
+
+  const activePantry = pantries.find(p => p.id === activePantryId) || pantries[0] || { id: "default", name: "Mi Despensa", theme: "emerald" };
+  const activePantryTheme = activePantry.theme || "emerald";
+
+  const getThemeHex = (themeName: string) => {
+    const hexColors: Record<string, string> = {
+      emerald: "#10b981",
+      amber: "#f59e0b",
+      rose: "#f43f5e",
+      indigo: "#6366f1",
+      violet: "#8b5cf6"
+    };
+    return hexColors[themeName] || "#10b981";
+  };
+
+  const savePantries = async (newPantries: any[], newActiveId: string) => {
+    setPantries(newPantries);
+    setActivePantryId(newActiveId);
+
+    if (session?.user) {
+      try {
+        const { error } = await supabase.auth.updateUser({
+          data: {
+            pantries: newPantries,
+            activePantryId: newActiveId
+          }
+        });
+        if (error) throw error;
+      } catch (err: any) {
+        console.error("Error saving pantries to Supabase:", err);
+        triggerAlert("error", "No se pudo guardar la configuración de despensas en la nube.");
+      }
+    } else {
+      localStorage.setItem("despensia_pantries", JSON.stringify(newPantries));
+      localStorage.setItem("despensia_active_pantry", newActiveId);
+    }
+  };
+
+  const handleDeletePantry = async (pantryIdToDelete: string) => {
+    if (pantryIdToDelete === "default") {
+      triggerAlert("error", "No puedes eliminar la despensa principal.");
+      return;
+    }
+    
+    if (!confirm("¿Estás seguro de que deseas eliminar esta despensa? Todos los alimentos asociados a ella se eliminarán permanentemente.")) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Find foods to delete
+      const itemsToDelete = inventory.filter(item => {
+        const { pantryId } = parseCategory(item.category);
+        return pantryId === pantryIdToDelete;
+      });
+
+      // Delete foods
+      for (const item of itemsToDelete) {
+        if (session?.user) {
+          await supabase
+            .from("inventory")
+            .delete()
+            .eq("id", item.id)
+            .eq("user_id", session.user.id);
+        } else {
+          await fetch(`/api/inventory/${item.id}`, { method: "DELETE" });
+        }
+      }
+
+      // Filter out deleted pantry
+      const updatedPantries = pantries.filter(p => p.id !== pantryIdToDelete);
+      let newActiveId = activePantryId;
+      if (activePantryId === pantryIdToDelete) {
+        newActiveId = "default";
+      }
+
+      await savePantries(updatedPantries, newActiveId);
+      triggerAlert("success", "Despensa y sus alimentos eliminados correctamente.");
+      fetchData();
+    } catch (err: any) {
+      console.error(err);
+      triggerAlert("error", "Fallo al eliminar despensa: " + (err.message || err.toString()));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // --- FILTROS Y BÚSQUEDAS ---
   const [pantrySearch, setPantrySearch] = useState("");
@@ -246,6 +585,16 @@ export default function App() {
           preferences: metadata.preferences || [],
           cookingStyle: metadata.cookingStyle || "Saludable y Balanceada"
         });
+        if (metadata.pantries) {
+          setPantries(metadata.pantries);
+        } else {
+          setPantries([{ id: "default", name: "Mi Despensa", theme: "emerald" }]);
+        }
+        if (metadata.activePantryId) {
+          setActivePantryId(metadata.activePantryId);
+        } else {
+          setActivePantryId("default");
+        }
         if (!metadata.setup_completed) {
           setShowOnboardingModal(true);
           setOnboardingStep(1);
@@ -266,6 +615,22 @@ export default function App() {
         } catch (e) {
           console.error("Error parsing local preferences", e);
         }
+      }
+      const localPantriesStr = localStorage.getItem("despensia_pantries");
+      if (localPantriesStr) {
+        try {
+          setPantries(JSON.parse(localPantriesStr));
+        } catch (e) {
+          console.error("Error parsing local pantries", e);
+        }
+      } else {
+        setPantries([{ id: "default", name: "Mi Despensa", theme: "emerald" }]);
+      }
+      const localActivePantryId = localStorage.getItem("despensia_active_pantry");
+      if (localActivePantryId) {
+        setActivePantryId(localActivePantryId);
+      } else {
+        setActivePantryId("default");
       }
       const setupCompleted = localStorage.getItem("despensia_setup_completed") === "true";
       if (!setupCompleted) {
@@ -416,7 +781,7 @@ export default function App() {
               name: item.name,
               quantity: item.quantity,
               unit: item.unit,
-              category: item.category,
+              category: encodeCategory(activePantryId, item.category),
               user_id: session.user.id,
               last_updated: new Date().toISOString()
             };
@@ -425,7 +790,7 @@ export default function App() {
               name: item.name,
               quantity: item.quantity,
               unit: item.unit,
-              category: item.category
+              category: encodeCategory(activePantryId, item.category)
             };
           }
         });
@@ -492,6 +857,7 @@ export default function App() {
     }
 
     try {
+      const encodedCat = encodeCategory(activePantryId, newFood.category);
       if (session?.user) {
         // --- MODO SUPABASE CLOUD SYNC ---
         if (editingFoodId) {
@@ -501,7 +867,7 @@ export default function App() {
               name: newFood.name,
               quantity: parseFloat(newFood.quantity),
               unit: newFood.unit,
-              category: newFood.category,
+              category: encodedCat,
               last_updated: new Date().toISOString()
             })
             .eq("id", editingFoodId)
@@ -517,7 +883,7 @@ export default function App() {
               name: newFood.name,
               quantity: parseFloat(newFood.quantity),
               unit: newFood.unit,
-              category: newFood.category,
+              category: encodedCat,
               user_id: session.user.id,
               last_updated: new Date().toISOString()
             });
@@ -535,7 +901,7 @@ export default function App() {
               name: newFood.name,
               quantity: parseFloat(newFood.quantity),
               unit: newFood.unit,
-              category: newFood.category
+              category: encodedCat
             })
           });
           if (res.ok) {
@@ -550,7 +916,7 @@ export default function App() {
               name: newFood.name,
               quantity: parseFloat(newFood.quantity),
               unit: newFood.unit,
-              category: newFood.category
+              category: encodedCat
             })
           });
           if (res.ok) {
@@ -708,7 +1074,7 @@ export default function App() {
       // Registrar cada elemento individualmente en la base de datos de despensa
       for (const item of scannerDraft) {
         // Comprobar si ya existe uno igual para sumar la cantidad
-        const existing = inventory.find(
+        const existing = activeInventory.find(
           it => it.name.toLowerCase() === item.name.toLowerCase() && it.unit === item.unit
         );
 
@@ -729,7 +1095,7 @@ export default function App() {
                 name: item.name,
                 quantity: parseFloat(item.quantity),
                 unit: item.unit,
-                category: item.category,
+                category: encodeCategory(activePantryId, item.category),
                 user_id: session.user.id,
                 last_updated: new Date().toISOString()
               });
@@ -753,7 +1119,7 @@ export default function App() {
                 name: item.name,
                 quantity: parseFloat(item.quantity),
                 unit: item.unit,
-                category: item.category
+                category: encodeCategory(activePantryId, item.category)
               })
             });
           }
@@ -783,7 +1149,7 @@ export default function App() {
   };
 
   const selectAllWithStock = () => {
-    const list = inventory.filter(it => it.quantity > 0).map(it => it.name);
+    const list = activeInventory.filter(it => it.quantity > 0).map(it => it.name);
     setSelectedForRecipe(list);
   };
 
@@ -798,7 +1164,7 @@ export default function App() {
 
     try {
       // Filtrar alimentos completos que están seleccionados
-      const itemsSelected = inventory
+      const itemsSelected = activeInventory
         .filter(it => selectedForRecipe.includes(it.name))
         .map(it => ({ name: it.name, quantity: it.quantity, unit: it.unit }));
 
@@ -1055,7 +1421,7 @@ export default function App() {
     // Parsear ingredientes para ajustes en vivo de consumo
     const mappedIngredients = recipe.ingredients_required.map((req: any) => {
       // Buscar coincidencia aproximada de alimento en el inventario actual
-      const match = inventory.find(
+      const match = activeInventory.find(
         inv => inv.name.toLowerCase().includes(req.name.toLowerCase()) || 
                req.name.toLowerCase().includes(inv.name.toLowerCase())
       );
@@ -1356,7 +1722,7 @@ export default function App() {
       // 1. Recorrer ingredientes necesarios de la receta
       for (const ingredient of recipe.ingredients_required) {
         // Tratar de buscar coincidencias aproximadas (case insensitive)
-        const match = inventory.find(
+        const match = activeInventory.find(
           item => item.name.toLowerCase().includes(ingredient.name.toLowerCase()) || 
                   ingredient.name.toLowerCase().includes(item.name.toLowerCase())
         );
@@ -1433,7 +1799,7 @@ export default function App() {
     const missing: string[] = [];
 
     recipe.ingredients_required.forEach((req: any) => {
-      const match = inventory.find(
+      const match = activeInventory.find(
         inv => inv.name.toLowerCase().includes(req.name.toLowerCase()) || 
                req.name.toLowerCase().includes(inv.name.toLowerCase())
       );
@@ -1858,6 +2224,7 @@ export default function App() {
 
   return (
     <div id="despensia-container" className="min-h-screen bg-slate-50 text-slate-900 font-sans leading-normal">
+      <style dangerouslySetInnerHTML={{ __html: getThemeStylesheet(activePantryTheme) }} />
       
       {/* HEADER DE LA APP */}
       <header id="main-header" className="bg-white border-b border-slate-100 sticky top-0 z-30 shadow-xs">
@@ -1929,12 +2296,12 @@ export default function App() {
             <div className="flex items-center gap-2 sm:gap-3 py-1">
               <div className="bg-slate-100/70 border border-slate-100 px-3 py-1.5 rounded-lg text-center min-w-[80px]">
                 <span className="text-xs text-slate-400 block uppercase font-bold tracking-wider">Despensa</span>
-                <span className="text-sm font-bold text-slate-700">{inventory.length} items</span>
+                <span className="text-sm font-bold text-slate-700">{activeInventory.length} items</span>
               </div>
               <div className="bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-lg text-center min-w-[80px]">
                 <span className="text-xs text-amber-500 block uppercase font-bold tracking-wider">Alertas</span>
                 <span className="text-sm font-bold text-amber-600">
-                  {inventory.filter(it => it.quantity <= 150 && it.unit === 'g' || it.quantity <= 1 && it.unit === 'uds').length} críticas
+                  {activeInventory.filter(it => it.quantity <= 150 && it.unit === 'g' || it.quantity <= 1 && it.unit === 'uds').length} críticas
                 </span>
               </div>
               <div className="bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg text-center min-w-[80px]">
@@ -2024,16 +2391,76 @@ export default function App() {
         {/* ==================================================================== */}
         {activeTab === "pantry" && (
           <div id="panel-pantry" className="space-y-8">
-            
+            {/* CABECERA Y SELECCIÓN DE DESPENSA */}
+            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-slate-700 shadow-2xs flex items-center justify-center">
+                  <Warehouse className="w-6 h-6" style={{ color: getThemeHex(activePantryTheme) }} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-xl font-extrabold text-slate-800">{activePantry.name}</h2>
+                    <span className="text-[10px] uppercase tracking-widest font-black px-2 py-0.5 rounded-full border border-slate-200 bg-slate-50" style={{ borderColor: getThemeHex(activePantryTheme) + '33', color: getThemeHex(activePantryTheme) }}>
+                      Tema: {activePantryTheme}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">Sincronizado y listo para formular menús</p>
+                </div>
+              </div>
+
+              {/* Selector de Despensas y Acciones */}
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+                <div className="relative w-full sm:w-48">
+                  <select
+                    value={activePantryId}
+                    onChange={(e) => savePantries(pantries, e.target.value)}
+                    className="w-full pl-3 pr-8 py-2.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl text-xs font-extrabold text-slate-700 border border-slate-200 focus:outline-none focus:ring-2 transition-all cursor-pointer appearance-none"
+                    style={{ focusRingColor: getThemeHex(activePantryTheme) }}
+                  >
+                    {pantries.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setEditingPantryId(activePantryId);
+                    setPantryForm({ name: activePantry.name, theme: activePantry.theme || "emerald" });
+                    setShowPantryModal(true);
+                  }}
+                  className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl border border-slate-200 transition-all active:scale-95 cursor-pointer"
+                  title="Configurar / Renombrar despensa"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+
+                <button
+                  onClick={() => {
+                    setEditingPantryId(null);
+                    setPantryForm({ name: "", theme: "emerald" });
+                    setShowPantryModal(true);
+                  }}
+                  className="bg-slate-800 text-slate-100 hover:bg-slate-700 font-extrabold text-xs py-2.5 px-4 rounded-xl flex items-center gap-1.5 border border-slate-700 shadow-2xs transition-all active:scale-95 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Nueva Despensa
+                </button>
+              </div>
+            </div>
+
             {/* ALERTAS CRÍTICAS DE STOCK BAJO */}
-            {inventory.some(it => it.quantity <= 150 && it.unit === 'g' || it.quantity <= 1 && it.unit === 'uds') && (
+            {activeInventory.some(it => it.quantity <= 150 && it.unit === 'g' || it.quantity <= 1 && it.unit === 'uds') && (
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0 animate-pulse" />
                 <div>
                   <h4 className="text-sm font-bold text-amber-900">Alimentos a punto de agotarse o vacíos de stock</h4>
                   <p className="text-xs text-amber-700 mt-0.5">Te sugerimos reponer inteligentemente estos productos antes de que planifiques tu próxima receta:</p>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    {inventory
+                    {activeInventory
                       .filter(it => it.quantity <= 150 && it.unit === 'g' || it.quantity <= 1 && it.unit === 'uds')
                       .map(it => (
                         <span key={it.id} className="text-xs bg-white text-amber-800 px-2 py-1 rounded-md border border-amber-100 font-semibold shadow-xs">
@@ -2368,7 +2795,7 @@ export default function App() {
               <div className="bg-slate-50/50 px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-4">
                 <div>
                   <h3 className="font-bold text-slate-800">Alimentos Registrados en Tu Casa</h3>
-                  <p className="text-xs text-slate-400">Total en despensa: {inventory.length} alimentos listos para cocinar</p>
+                  <p className="text-xs text-slate-400">Total en despensa: {activeInventory.length} alimentos listos para cocinar</p>
                 </div>
                 <button 
                   onClick={() => selectAllWithStock()} 
@@ -2378,7 +2805,7 @@ export default function App() {
                 </button>
               </div>
 
-              {inventory.length === 0 ? (
+              {activeInventory.length === 0 ? (
                 <div className="p-12 text-center text-slate-400 space-y-3">
                   <Carrot className="w-12 h-12 text-slate-300 mx-auto" />
                   <p className="font-medium">No hay ingredientes registrados en tu despensa todavía.</p>
@@ -2397,7 +2824,7 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100/60 text-sm">
-                      {inventory
+                      {activeInventory
                         .filter(food => {
                           const matchesSearch = food.name.toLowerCase().includes(pantrySearch.toLowerCase());
                           const matchesFilter = pantryFilter === "Todos" || food.category === pantryFilter;
@@ -3440,6 +3867,119 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* MODAL DE GESTIÓN DE DESPENSA */}
+      {showPantryModal && (
+        <div id="pantry-modal-overlay" className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 border border-slate-100 shadow-2xl relative animate-fade-in text-left">
+            <h3 className="font-extrabold text-lg text-slate-800 flex items-center gap-2">
+              <Warehouse className="w-5 h-5" style={{ color: getThemeHex(pantryForm.theme) }} />
+              {editingPantryId && editingPantryId !== "new" && editingPantryId !== "default" ? "Editar Despensa" : "Nueva Despensa"}
+            </h3>
+            
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!pantryForm.name.trim()) {
+                triggerAlert("error", "Por favor ingresa un nombre para la despensa.");
+                return;
+              }
+
+              if (editingPantryId && editingPantryId !== "new") {
+                // Rename or update existing pantry
+                const updatedPantries = pantries.map(p => 
+                  p.id === editingPantryId ? { ...p, name: pantryForm.name.trim(), theme: pantryForm.theme } : p
+                );
+                await savePantries(updatedPantries, editingPantryId);
+                triggerAlert("success", "Despensa actualizada correctamente.");
+              } else {
+                // Create a new pantry
+                const newId = "pantry_" + Date.now();
+                const updatedPantries = [...pantries, { id: newId, name: pantryForm.name.trim(), theme: pantryForm.theme }];
+                await savePantries(updatedPantries, newId);
+                triggerAlert("success", `Despensa "${pantryForm.name}" creada y seleccionada.`);
+              }
+              setShowPantryModal(false);
+            }} className="mt-4 space-y-4">
+              
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 font-sans">Nombre de la Despensa</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Despensa Playa, Oficina, Casa..."
+                  value={pantryForm.name}
+                  onChange={(e) => setPantryForm(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full bg-slate-55 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-300 focus:bg-white transition-all text-slate-800"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 font-sans">Tema de Color</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { id: "emerald", name: "Esmeralda", hex: "#10b981" },
+                    { id: "amber", name: "Ámbar", hex: "#f59e0b" },
+                    { id: "rose", name: "Rosa", hex: "#f43f5e" },
+                    { id: "indigo", name: "Índigo", hex: "#6366f1" },
+                    { id: "violet", name: "Violeta", hex: "#8b5cf6" }
+                  ].map(color => (
+                    <button
+                      key={color.id}
+                      type="button"
+                      onClick={() => setPantryForm(prev => ({ ...prev, theme: color.id }))}
+                      className={`h-10 rounded-xl flex items-center justify-center border-2 transition-all relative hover:scale-105 active:scale-95 cursor-pointer`}
+                      style={{
+                        backgroundColor: color.hex,
+                        borderColor: pantryForm.theme === color.id ? "#1e293b" : "transparent"
+                      }}
+                      title={color.name}
+                    >
+                      {pantryForm.theme === color.id && (
+                        <Check className="w-4 h-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)] font-bold" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-4 flex items-center justify-between gap-3 border-t border-slate-100">
+                {editingPantryId && editingPantryId !== "default" && editingPantryId !== "new" ? (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowPantryModal(false);
+                      await handleDeletePantry(editingPantryId);
+                    }}
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-xs py-2.5 px-4 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Eliminar
+                  </button>
+                ) : (
+                  <div />
+                )}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowPantryModal(false)}
+                    className="text-slate-400 hover:text-slate-600 text-xs font-bold uppercase tracking-wider cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-extrabold text-xs py-2.5 px-5 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DE CONFIGURACIÓN DE PERFIL Y ONBOARDING */}
       {showOnboardingModal && (
         <div id="onboarding-modal-overlay" className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
