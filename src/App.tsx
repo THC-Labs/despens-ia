@@ -2885,8 +2885,9 @@ export default function App() {
                 </h4>
                 <ul className="text-xs text-slate-350 space-y-2.5 list-disc list-inside">
                   <li><strong>Apoyo económico</strong>: Si quieres ayudarnos a mantener los servidores y la API de Gemini, puedes <a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">invitarnos a un café en Ko-fi</a>.</li>
-                  <li><strong>Feedback y sugerencias</strong>: Escríbenos con cualquier idea o fallo que detectes para seguir mejorando.</li>
-                  <li><strong>Comparte la app</strong>: Si la app te resulta útil, recomiéndala a tus amigos o familiares.</li>
+                  <li><strong>Supermercados y Afiliados</strong>: Si representas a una cadena de supermercados o tienda de alimentación y te interesa integrar un plan de afiliados para nuestra lista de la compra inteligente, escríbenos a <a href="mailto:didacwm@gmail.com" className="text-emerald-400 hover:underline font-bold">didacwm@gmail.com</a> para explorar integraciones.</li>
+                  <li><strong>Feedback y propuestas</strong>: ¿Has encontrado un bug o tienes sugerencias de mejora? Contáctanos directamente en <a href="mailto:didacwm@gmail.com" className="text-emerald-400 hover:underline font-bold">didacwm@gmail.com</a>.</li>
+                  <li><strong>Comparte la app</strong>: Si la app te resulta útil, recomiéndala a tus amigos o familiares para ayudarnos a crecer.</li>
                 </ul>
               </div>
               <div className="pt-2 flex flex-wrap gap-4 justify-center">
@@ -2899,10 +2900,10 @@ export default function App() {
                   ☕ Apóyanos en Ko-fi
                 </a>
                 <a 
-                  href="mailto:contact@thclabs.co" 
+                  href="mailto:didacwm@gmail.com" 
                   className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 font-extrabold text-xs px-6 py-3.5 rounded-xl border border-slate-700 transition-all inline-flex items-center gap-2 cursor-pointer"
                 >
-                  ✉️ Contactar con THC Labs
+                  ✉️ Escríbenos a didacwm@gmail.com
                 </a>
               </div>
             </div>
