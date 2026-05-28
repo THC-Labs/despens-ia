@@ -15,7 +15,9 @@ const runtimeFilename = typeof __filename !== "undefined"
 const runtimeDirname = typeof __dirname !== "undefined" 
   ? __dirname 
   : path.dirname(runtimeFilename);
-const dbPath = path.join(runtimeDirname, "db.json");
+const dbPath = process.env.VERCEL
+  ? path.join("/tmp", "db.json")
+  : path.join(runtimeDirname, "db.json");
 
 // Función helper para obtener la instancia del cliente del SDK de Google GenAI
 // con la cabecera correspondiente requerida por AI Studio Build.
@@ -1117,4 +1119,8 @@ async function main() {
   });
 }
 
-main().catch(console.error);
+if (!process.env.VERCEL) {
+  main().catch(console.error);
+}
+
+export default app;
