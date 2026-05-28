@@ -42,7 +42,7 @@ export const translations: Record<string, string> = {
   collabFeedback: "Feedback y propuestas: ¿Has encontrado un bug o tienes sugerencias de mejora? Escríbenos directamente.",
   collabShare: "Comparte la app: Si te resulta útil, recomiéndala a tus amigos o familiares para ayudarnos a crecer.",
   kofiCTA: "☕ Apóyanos en Ko-fi",
-  emailCTA: "✉️ Escríbenos a didacwm@gmail.com",
+  emailCTA: "✉️ Escríbenos a hola@thehashcode.org",
   
   // Auth Panel
   authTitle: "Accede a tu Despensa Cloud",

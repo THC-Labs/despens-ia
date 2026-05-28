@@ -3252,8 +3252,8 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
                 </h4>
                 <ul className="text-xs text-slate-350 space-y-2.5 list-disc list-inside">
                   <li><strong>Apoyo económico</strong>: Si quieres ayudarnos a mantener los servidores y la API de Gemini, puedes <a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">invitarnos a un café en Ko-fi</a>.</li>
-                  <li><strong>Supermercados y Afiliados</strong>: Si representas a una cadena de supermercados o tienda de alimentación y te interesa integrar un plan de afiliados para nuestra lista de la compra inteligente, escríbenos a <a href="mailto:didacwm@gmail.com" className="text-emerald-400 hover:underline font-bold">didacwm@gmail.com</a> para explorar integraciones.</li>
-                  <li><strong>Feedback y propuestas</strong>: ¿Has encontrado un bug o tienes sugerencias de mejora? Contáctanos directamente en <a href="mailto:didacwm@gmail.com" className="text-emerald-400 hover:underline font-bold">didacwm@gmail.com</a>.</li>
+                  <li><strong>Supermercados y Afiliados</strong>: Si representas a una cadena de supermercados o tienda de alimentación y te interesa integrar un plan de afiliados para nuestra lista de la compra inteligente, escríbenos a <a href="mailto:hola@thehashcode.org" className="text-emerald-400 hover:underline font-bold">hola@thehashcode.org</a> para explorar integraciones.</li>
+                  <li><strong>Feedback y propuestas</strong>: ¿Has encontrado un bug o tienes sugerencias de mejora? Contáctanos directamente en <a href="mailto:hola@thehashcode.org" className="text-emerald-400 hover:underline font-bold">hola@thehashcode.org</a>.</li>
                   <li><strong>Comparte la app</strong>: Si la app te resulta útil, recomiéndala a tus amigos o familiares para ayudarnos a crecer.</li>
                 </ul>
               </div>
@@ -3267,10 +3267,10 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
                   ☕ Apóyanos en Ko-fi
                 </a>
                 <a 
-                  href="mailto:didacwm@gmail.com" 
+                  href="mailto:hola@thehashcode.org" 
                   className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 font-extrabold text-xs px-6 py-3.5 rounded-xl border border-slate-700 transition-all inline-flex items-center gap-2 cursor-pointer"
                 >
-                  ✉️ Escríbenos a didacwm@gmail.com
+                  ✉️ Escríbenos a hola@thehashcode.org
                 </a>
               </div>
             </div>
@@ -5627,7 +5627,7 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
                   Acceso Demo Rápido
                 </p>
                 <p className="text-[9px] text-slate-400 leading-normal">
-                  Puedes registrarte con cualquier correo inventado o real como <strong className="font-semibold select-all text-slate-600">didacwm@gmail.com</strong> para simular el multiusuario listo para móviles instantly.
+                  Puedes registrarte con cualquier correo inventado o real como <strong className="font-semibold select-all text-slate-600">hola@thehashcode.org</strong> para simular el multiusuario listo para móviles instantly.
                 </p>
               </div>
             )}
@@ -6032,7 +6032,7 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
               <section className="space-y-1">
                 <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[10px]">1. ¿Quiénes somos?</h4>
                 <p>
-                  Esta aplicación es un proyecto independiente (indie) desarrollado por <strong>THC Labs</strong>. Si tienes dudas, sugerencias o quieres solicitar la eliminación de tus datos, puedes contactarnos directamente en <a href="mailto:didacwm@gmail.com" className="text-emerald-600 font-bold hover:underline">didacwm@gmail.com</a>.
+                  Esta aplicación es un proyecto independiente (indie) desarrollado por <strong>THC Labs</strong>. Si tienes dudas, sugerencias o quieres solicitar la eliminación de tus datos, puedes contactarnos directamente en <a href="mailto:hola@thehashcode.org" className="text-emerald-600 font-bold hover:underline">hola@thehashcode.org</a>.
                 </p>
               </section>
 
@@ -6064,7 +6064,7 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
               <section className="space-y-1">
                 <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[10px]">5. Derechos de Usuario (RGPD)</h4>
                 <p>
-                  Tienes derecho a acceder, corregir o borrar tus datos en cualquier momento. Si quieres eliminar tu cuenta de forma definitiva y borrar todo tu inventario del servidor en la nube, puedes hacerlo escribiendo a <a href="mailto:didacwm@gmail.com" className="text-emerald-600 font-bold hover:underline">didacwm@gmail.com</a> y procesaremos tu baja inmediatamente.
+                  Tienes derecho a acceder, corregir o borrar tus datos en cualquier momento. Si quieres eliminar tu cuenta de forma definitiva y borrar todo tu inventario del servidor en la nube, puedes hacerlo escribiendo a <a href="mailto:hola@thehashcode.org" className="text-emerald-600 font-bold hover:underline">hola@thehashcode.org</a> y procesaremos tu baja inmediatamente.
                 </p>
               </section>
             </div>
