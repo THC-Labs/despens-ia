@@ -63,3 +63,17 @@ export interface Database {
     };
   };
 }
+
+export interface MacroGoals {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+export interface Macros {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
