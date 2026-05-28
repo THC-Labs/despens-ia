@@ -9,7 +9,7 @@ import { MacroGoals, Macros } from "./types/database";
 import MealPlannerTab from "./components/MealPlannerTab";
 import LiveCookingModal from "./components/LiveCookingModal";
 import TicketScannerModal from "./components/TicketScannerModal";
-import { Language, translations } from "./i18n";
+import { translations } from "./translations";
 import {
   CookingPot,
   Plus,
@@ -659,30 +659,121 @@ export default function App() {
 
   // --- AUXILIRES DE LISTA DE LA COMPRA ---
   const shoppingListItems = useMemo(() => {
-    // 1. Obtener alimentos con stock crítico o agotado de las despensas seleccionadas
+    // 0. Obtener ingredientes requeridos para menús planificados no consumidos
+    const todayStr = formatLocalDate(new Date());
+    const activePlannedMeals = mealPlan.filter(p => p.status === "planned" && p.date >= todayStr);
+
+    const getRelativeDateLabel = (dateStr: string) => {
+      const today = new Date();
+      const tStr = formatLocalDate(today);
+      
+      const tomorrow = new Date();
+      tomorrow.setDate(today.getDate() + 1);
+      const tomStr = formatLocalDate(tomorrow);
+      
+      if (dateStr === tStr) {
+        return "hoy";
+      } else if (dateStr === tomStr) {
+        return "mañana";
+      } else {
+        try {
+          const dateObj = new Date(dateStr + "T00:00:00");
+          const days = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+          return `el ${days[dateObj.getDay()]}`;
+        } catch (e) {
+          return `el ${dateStr}`;
+        }
+      }
+    };
+
+    // Agrupar por ingrediente normalizado
+    const neededIngredients: Record<string, { name: string, totalQty: number, unit: string, plans: Array<{ recipeTitle: string, date: string }> }> = {};
+
+    activePlannedMeals.forEach(plan => {
+      const recipe = recipes.find(r => r.id === plan.recipe_id);
+      if (recipe && recipe.ingredients_required) {
+        recipe.ingredients_required.forEach((ing: any) => {
+          const nameNorm = ing.name.trim().toLowerCase();
+          const qty = parseFloat(ing.quantity) || 0;
+          const unit = ing.unit || "";
+          
+          if (!neededIngredients[nameNorm]) {
+            neededIngredients[nameNorm] = {
+              name: ing.name.trim(),
+              totalQty: 0,
+              unit: unit,
+              plans: []
+            };
+          }
+          neededIngredients[nameNorm].totalQty += qty;
+          neededIngredients[nameNorm].plans.push({
+            recipeTitle: recipe.title,
+            date: plan.date
+          });
+        });
+      }
+    });
+
+    const matchedKeys = new Set<string>();
+
+    // 1. Obtener alimentos con stock crítico o déficit de las despensas seleccionadas
     const itemsFromPantries = inventory.filter(item => {
       const { pantryId } = parseCategory(item.category);
       if (!selectedPantriesForList.includes(pantryId)) return false;
       
+      // Match con ingredientes de recetas
+      const itemNorm = item.name.trim().toLowerCase();
+      let totalNeeded = 0;
+      Object.entries(neededIngredients).forEach(([key, needed]) => {
+        if (itemNorm.includes(key) || key.includes(itemNorm)) {
+          totalNeeded += needed.totalQty;
+          matchedKeys.add(key);
+        }
+      });
+
       const qty = parseFloat(item.quantity) || 0;
       const unit = (item.unit || "").toLowerCase();
       
       // Si la cantidad es 0 o menor, está agotado
       if (qty <= 0) return true;
       
-      // Stock crítico por unidades
+      // Defecto o déficit
+      if (totalNeeded > qty) return true;
+      
+      // Stock crítico tradicional
       if (unit === 'g' || unit === 'ml') {
         return qty <= 150;
       }
       if (unit === 'kg' || unit === 'l' || unit === 'litros') {
         return qty <= 0.15;
       }
-      // Por defecto para unidades (uds) o cualquier otro
       return qty <= 1;
     }).map(item => {
       const { category, pantryId } = parseCategory(item.category);
       const pantryName = pantries.find(p => p.id === pantryId)?.name || "Despensa";
       const pantryTheme = pantries.find(p => p.id === pantryId)?.theme || "emerald";
+      
+      // Obtener el total necesitado y planes asociados
+      const itemNorm = item.name.trim().toLowerCase();
+      let totalNeeded = 0;
+      const matchedPlans: any[] = [];
+      Object.entries(neededIngredients).forEach(([key, needed]) => {
+        if (itemNorm.includes(key) || key.includes(itemNorm)) {
+          totalNeeded += needed.totalQty;
+          matchedPlans.push(...needed.plans);
+        }
+      });
+      
+      const qty = parseFloat(item.quantity) || 0;
+      const deficitQty = totalNeeded > qty ? (totalNeeded - qty) : 0;
+
+      let reason = "";
+      if (deficitQty > 0 && matchedPlans.length > 0) {
+        const plansDesc = matchedPlans.map(p => `"${p.recipeTitle}" (${getRelativeDateLabel(p.date)})`);
+        const uniquePlansDesc = Array.from(new Set(plansDesc));
+        reason = `Te hace falta para: ${uniquePlansDesc.join(" y ")}`;
+      }
+
       return {
         id: item.id,
         name: item.name,
@@ -692,11 +783,42 @@ export default function App() {
         pantryId: pantryId,
         pantryName: pantryName,
         pantryTheme: pantryTheme,
-        isCustom: false
+        isCustom: false,
+        deficitQty: deficitQty,
+        neededForMenu: totalNeeded,
+        reason: reason
       };
     });
 
-    // 2. Agregar ítems personalizados
+    // 2. Agregar ingredientes de recetas que no existen en absoluto en el inventario (si está seleccionada la despensa por defecto)
+    const missingItems: any[] = [];
+    const defaultSelected = selectedPantriesForList.includes("default");
+    
+    Object.entries(neededIngredients).forEach(([key, needed]) => {
+      if (!matchedKeys.has(key) && defaultSelected) {
+        const plansDesc = needed.plans.map(p => `"${p.recipeTitle}" (${getRelativeDateLabel(p.date)})`);
+        const uniquePlansDesc = Array.from(new Set(plansDesc));
+        const reason = `Te hace falta para: ${uniquePlansDesc.join(" y ")}`;
+
+        missingItems.push({
+          id: `menu_missing_${key.replace(/[^a-z0-9]/g, "_")}`,
+          name: needed.name,
+          quantity: 0,
+          unit: needed.unit,
+          category: "default::Otros",
+          pantryId: "default",
+          pantryName: "Mi Despensa",
+          pantryTheme: "emerald",
+          isCustom: false,
+          deficitQty: needed.totalQty,
+          neededForMenu: needed.totalQty,
+          reason: reason,
+          isNewIngredient: true
+        });
+      }
+    });
+
+    // 3. Agregar ítems personalizados
     const customItems = customShoppingItems.map((name, idx) => ({
       id: `custom_${idx}`,
       name: name,
@@ -709,8 +831,8 @@ export default function App() {
       isCustom: true
     }));
 
-    return [...itemsFromPantries, ...customItems];
-  }, [inventory, selectedPantriesForList, customShoppingItems, pantries]);
+    return [...itemsFromPantries, ...missingItems, ...customItems];
+  }, [inventory, selectedPantriesForList, customShoppingItems, pantries, mealPlan, recipes]);
 
   const handleCopyShoppingList = () => {
     if (shoppingListItems.length === 0) {
@@ -746,27 +868,58 @@ export default function App() {
       let restockedCount = 0;
 
       for (const item of inventoryItemsToRestock) {
-        const origItem = inventory.find(it => it.id === item.id);
-        if (!origItem) continue;
-        
-        const restockQty = item.unit === "g" || item.unit === "ml" ? 500 : 6;
-        const newQty = origItem.quantity + restockQty;
+        const isNew = item.id.startsWith("menu_missing_");
+        const standardRestock = item.unit === "g" || item.unit === "ml" ? 500 : 6;
+        const restockQty = Math.max(standardRestock, item.deficitQty || 0);
 
-        if (session?.user) {
-          const { error } = await supabase
-            .from("inventory")
-            .update({ quantity: newQty, last_updated: new Date().toISOString() })
-            .eq("id", item.id)
-            .eq("user_id", session.user.id);
-          if (error) throw error;
+        if (isNew) {
+          if (session?.user) {
+            const { error } = await supabase
+              .from("inventory")
+              .insert({
+                user_id: session.user.id,
+                name: item.name,
+                quantity: restockQty,
+                unit: item.unit,
+                category: "default::Otros",
+                last_updated: new Date().toISOString()
+              });
+            if (error) throw error;
+          } else {
+            await fetch("/api/inventory", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                name: item.name,
+                quantity: restockQty,
+                unit: item.unit,
+                category: "default::Otros"
+              })
+            });
+          }
+          restockedCount++;
         } else {
-          await fetch(`/api/inventory/${item.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ quantity: newQty })
-          });
+          const origItem = inventory.find(it => it.id === item.id);
+          if (!origItem) continue;
+          
+          const newQty = origItem.quantity + restockQty;
+
+          if (session?.user) {
+            const { error } = await supabase
+              .from("inventory")
+              .update({ quantity: newQty, last_updated: new Date().toISOString() })
+              .eq("id", item.id)
+              .eq("user_id", session.user.id);
+            if (error) throw error;
+          } else {
+            await fetch(`/api/inventory/${item.id}`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ quantity: newQty })
+            });
+          }
+          restockedCount++;
         }
-        restockedCount++;
       }
 
       let newCustomItems = customShoppingItems;
@@ -791,27 +944,65 @@ export default function App() {
   };
 
   const handleRestockItem = async (itemId: string, restockQty: number) => {
-    const item = inventory.find(it => it.id === itemId);
-    if (!item) return;
-    const newQty = item.quantity + restockQty;
+    const isNew = itemId.startsWith("menu_missing_");
+    let item: any = null;
+    let newQty = 0;
+
+    if (isNew) {
+      item = shoppingListItems.find(it => it.id === itemId);
+      if (!item) return;
+      newQty = restockQty;
+    } else {
+      item = inventory.find(it => it.id === itemId);
+      if (!item) return;
+      newQty = item.quantity + restockQty;
+    }
 
     setLoading(true);
     try {
-      if (session?.user) {
-        const { error } = await supabase
-          .from("inventory")
-          .update({ quantity: newQty, last_updated: new Date().toISOString() })
-          .eq("id", itemId)
-          .eq("user_id", session.user.id);
-        if (error) throw error;
+      if (isNew) {
+        if (session?.user) {
+          const { error } = await supabase
+            .from("inventory")
+            .insert({
+              user_id: session.user.id,
+              name: item.name,
+              quantity: newQty,
+              unit: item.unit,
+              category: "default::Otros",
+              last_updated: new Date().toISOString()
+            });
+          if (error) throw error;
+        } else {
+          await fetch("/api/inventory", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: item.name,
+              quantity: newQty,
+              unit: item.unit,
+              category: "default::Otros"
+            })
+          });
+        }
+        triggerAlert("success", `¡${item.name} añadido y repuesto en tu despensa!`);
       } else {
-        await fetch(`/api/inventory/${itemId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ quantity: newQty })
-        });
+        if (session?.user) {
+          const { error } = await supabase
+            .from("inventory")
+            .update({ quantity: newQty, last_updated: new Date().toISOString() })
+            .eq("id", itemId)
+            .eq("user_id", session.user.id);
+          if (error) throw error;
+        } else {
+          await fetch(`/api/inventory/${itemId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ quantity: newQty })
+          });
+        }
+        triggerAlert("success", `¡${item.name} repuesto con éxito!`);
       }
-      triggerAlert("success", `¡${item.name} repuesto con éxito!`);
       fetchData();
     } catch (err: any) {
       console.error(err);
@@ -984,6 +1175,7 @@ export default function App() {
   const [recipeProposals, setRecipeProposals] = useState<any[] | null>(null);
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<any | null>(null);
+  const [geminiUsage, setGeminiUsage] = useState<{ used: number; limit: number; remaining: number } | null>(null);
 
   // --- PRIVACIDAD, NORMATIVAS Y COOKIES ---
   const [showCookieBanner, setShowCookieBanner] = useState(false);
@@ -1008,25 +1200,9 @@ export default function App() {
     }
   }, []);
 
-  // --- IDIOMA / INTERNACIONALIZACIÓN ---
-  const [lang, setLang] = useState<Language>(() => {
-    const saved = localStorage.getItem("despensia_language");
-    if (saved === "es" || saved === "en" || saved === "ca" || saved === "gl") {
-      return saved as Language;
-    }
-    const browserLang = navigator.language.substring(0, 2);
-    if (browserLang === "ca") return "ca";
-    if (browserLang === "gl") return "gl";
-    if (browserLang === "en") return "en";
-    return "es";
-  });
-
-  useEffect(() => {
-    localStorage.setItem("despensia_language", lang);
-  }, [lang]);
-
+  // --- TRADUCCIÓN (SOLO ESPAÑOL) ---
   const t = (key: string): string => {
-    return translations[lang]?.[key] || translations["es"]?.[key] || key;
+    return translations[key] || key;
   };
 
   // (Estados y auto-guardado de Lista de la Compra se movieron al principio del componente)
@@ -1275,6 +1451,18 @@ export default function App() {
           setRecipes(recipesWithCovers);
           setMealPlan(plan);
         }
+      }
+
+      // Obtener el límite de uso de Gemini
+      try {
+        const uId = session?.user?.id || "guest";
+        const usageRes = await fetch(`/api/gemini/usage-status?userId=${uId}`);
+        if (usageRes.ok) {
+          const usageData = await usageRes.json();
+          setGeminiUsage(usageData);
+        }
+      } catch (e) {
+        console.warn("No se pudo obtener el límite de uso de Gemini:", e);
       }
     } catch (err: any) {
       console.error("Error al sincronizar datos:", err);
@@ -1823,6 +2011,7 @@ export default function App() {
           useOnlyPantryIngredients: useOnlyPantryIngredients,
           prioritizeExpiringIngredients: prioritizeExpiringIngredients,
           action: "propose",
+          userId: session?.user?.id || "guest",
           macroTargets: {
             calories: macroCal || undefined,
             protein: macroProt || undefined,
@@ -1834,7 +2023,8 @@ export default function App() {
 
       if (res.status === 429) {
         const errorData = await res.json().catch(() => ({}));
-        triggerAlert("error", errorData.error || "Se ha excedido el límite de llamadas mensuales a Gemini.");
+        triggerAlert("error", errorData.message || "Se ha excedido el límite de llamadas diarias o mensuales a Gemini.");
+        fetchData();
         return;
       }
 
@@ -1850,6 +2040,7 @@ export default function App() {
         } else {
           setGeneratedRecipeDraft(result);
         }
+        fetchData();
       } else {
         const errorData = await res.json().catch(() => ({}));
         const detailedMsg = errorData.error
@@ -1899,6 +2090,7 @@ export default function App() {
           prioritizeExpiringIngredients: prioritizeExpiringIngredients,
           action: "expand",
           selectedProposal: proposal,
+          userId: session?.user?.id || "guest",
           macroTargets: {
             calories: macroCal || undefined,
             protein: macroProt || undefined,
@@ -1910,7 +2102,8 @@ export default function App() {
 
       if (res.status === 429) {
         const errorData = await res.json().catch(() => ({}));
-        triggerAlert("error", errorData.error || "Se ha excedido el límite de llamadas mensuales a Gemini.");
+        triggerAlert("error", errorData.message || "Se ha excedido el límite de llamadas diarias o mensuales a Gemini.");
+        fetchData();
         return;
       }
 
@@ -1922,6 +2115,7 @@ export default function App() {
         } else {
           triggerAlert("success", `Receta "${recipeResult.title}" expandida redactada por Chef Gemini.`);
         }
+        fetchData();
       } else {
         const errorData = await res.json().catch(() => ({}));
         triggerAlert("error", errorData.error || "Error al expandir la propuesta culinaria con Gemini.");
@@ -2052,12 +2246,82 @@ export default function App() {
 
   const popularMatch = getPopularRecipeMatch();
 
+  const flexibleJsonParse = (text: string) => {
+    let cleanText = text.trim();
+    
+    // Si contiene marcas de código Markdown
+    if (cleanText.includes("```")) {
+      const match = cleanText.match(/```(?:json)?\s*([\s\S]+?)\s*```/i);
+      if (match) {
+        cleanText = match[1].trim();
+      }
+    }
+    
+    try {
+      const raw = JSON.parse(cleanText);
+      if (!raw || typeof raw !== "object") return null;
+      
+      const title = raw.title || raw.name || raw.titulo || "Receta Importada";
+      
+      const rawIngredients = raw.ingredients_required || raw.ingredients || raw.ingredientes || raw.ingredients_list || [];
+      const normalizedIngredients = Array.isArray(rawIngredients) 
+        ? rawIngredients.map((ing: any) => {
+            if (typeof ing === "string") {
+              return { name: ing, quantity: 0, unit: "" };
+            }
+            return {
+              name: String(ing.name || ing.ingrediente || ing.item || ""),
+              quantity: isNaN(parseFloat(ing.quantity || ing.cantidad)) ? 0 : parseFloat(ing.quantity || ing.cantidad),
+              unit: String(ing.unit || ing.unidad || ing.measure || "")
+            };
+          })
+        : [];
+        
+      let instructions = raw.instructions || raw.steps || raw.pasos || raw.preparacion || raw.preparation || "";
+      if (Array.isArray(instructions)) {
+        instructions = instructions.map((step: any, idx: number) => 
+          typeof step === "string" ? `${idx + 1}. ${step}` : `${idx + 1}. ${step.text || step.desc || ""}`
+        ).join("\n");
+      }
+      
+      let macros_summary = raw.macros_summary || raw.macros || raw.nutritional_info || raw.nutrition || "";
+      if (typeof macros_summary === "object") {
+        const parts = [];
+        if (macros_summary.calories || macros_summary.calorias) parts.push(`${macros_summary.calories || macros_summary.calorias} kcal`);
+        if (macros_summary.protein || macros_summary.proteinas) parts.push(`P: ${macros_summary.protein || macros_summary.proteinas}g`);
+        if (macros_summary.carbs || macros_summary.carbohidratos) parts.push(`C: ${macros_summary.carbs || macros_summary.carbohidratos}g`);
+        if (macros_summary.fat || macros_summary.grasas) parts.push(`G: ${macros_summary.fat || macros_summary.grasas}g`);
+        macros_summary = parts.join(" | ");
+      }
+      
+      return {
+        title: String(title),
+        ingredients_required: normalizedIngredients,
+        instructions: String(instructions),
+        macros_summary: String(macros_summary)
+      };
+    } catch (e) {
+      return null;
+    }
+  };
+
   // Importar copiada o link
   const handleImportTextRecipe = async () => {
     if (!importingText.trim()) {
       triggerAlert("error", "Pega el texto de la receta o ingredientes que quieras reformatear.");
       return;
     }
+
+    // Intentar parsear como JSON flexible directamente en el cliente
+    const localRecipe = flexibleJsonParse(importingText);
+    if (localRecipe) {
+      setGeneratedRecipeDraft(localRecipe);
+      setShowRecipeImporter(false);
+      setImportingText("");
+      triggerAlert("success", `Receta "${localRecipe.title}" importada y estructurada localmente con éxito.`);
+      return;
+    }
+
     setImportingState(true);
     try {
       const res = await fetch("/api/gemini/parse-recipe-import", {
@@ -2090,6 +2354,64 @@ export default function App() {
     } finally {
       setImportingState(false);
     }
+  };
+
+  const handleCopyAiPromptForExternalLLM = () => {
+    // 1. Filtrar alimentos seleccionados
+    const itemsSelected = selectedForRecipe.map(name => {
+      const inventoryItem = activeInventory.find(it => it.name.toLowerCase() === name.toLowerCase());
+      return inventoryItem 
+        ? `${inventoryItem.name} (${inventoryItem.quantity} ${inventoryItem.unit})`
+        : name;
+    });
+
+    if (itemsSelected.length === 0) {
+      triggerAlert("error", "Selecciona al menos un ingrediente de tu despensa para formular el prompt.");
+      return;
+    }
+
+    const ingredientsStr = itemsSelected.map(ing => `- ${ing}`).join("\n");
+    const allergiesStr = profilePrefs.allergies?.length > 0 ? profilePrefs.allergies.join(", ") : "Ninguna";
+    const preferencesStr = profilePrefs.preferences?.length > 0 ? profilePrefs.preferences.join(", ") : "Ninguna";
+    const cookingStyleStr = profilePrefs.cookingStyle || "Saludable y Balanceada";
+    const extraComments = chefExtraPrompt.trim() ? `"${chefExtraPrompt.trim()}"` : "Ninguno";
+
+    const hasMacroTargets = macroCal || macroProt || macroCarb || macroFat;
+    const macroTargetsStr = hasMacroTargets
+      ? `Objetivos Nutricionales Deseados:
+- Calorías: ${macroCal ? `~${macroCal} kcal` : "Sin especificar"}
+- Proteínas: ${macroProt ? `~${macroProt} g` : "Sin especificar"}
+- Carbohidratos: ${macroCarb ? `~${macroCarb} g` : "Sin especificar"}
+- Grasas: ${macroFat ? `~${macroFat} g` : "Sin especificar"}`
+      : "Sin objetivos nutricionales específicos (hazla equilibrada).";
+
+    const promptText = `Actúa como la inteligencia artificial chef de Despensia.
+A partir de los siguientes datos, diseña y genera una receta completa y deliciosa que aproveche al máximo estos ingredientes:
+
+Ingredientes disponibles en mi despensa:
+${ingredientsStr}
+
+Restricciones y Preferencias:
+- Alergias/Intolerancias: ${allergiesStr} (EXCLUYE estrictamente estos alérgenos de la receta).
+- Preferencias de dieta: ${preferencesStr}
+- Estilo de cocina: ${cookingStyleStr}
+- Comentarios del usuario: ${extraComments}
+
+${macroTargetsStr}
+
+Debes devolver obligatoriamente un bloque JSON válido con el siguiente formato, sin explicaciones ni texto adicional fuera de las llaves del JSON:
+{
+  "title": "Título de la receta limpio",
+  "ingredients_required": [
+    { "name": "Nombre ingrediente", "quantity": 100, "unit": "g" }
+  ],
+  "instructions": "Pasos numerados de la receta detallando la elaboración.",
+  "macros_summary": "Un resumen estimado de macros (ej. '420 kcal | P: 22g | C: 40g | G: 15g')"
+}
+Asegúrate de responder en español y de que el JSON sea sintácticamente válido.`;
+
+    navigator.clipboard.writeText(promptText);
+    triggerAlert("success", "¡Prompt de receta copiado al portapapeles! Pégalo en tu LLM (ChatGPT/Claude) y copia el JSON devuelto.");
   };
 
   const getRecipeCovers = () => {
@@ -2648,18 +2970,6 @@ export default function App() {
               <span className="text-xl font-black tracking-tight text-white">Despensia</span>
             </div>
             <div className="flex items-center gap-4 flex-wrap">
-              {/* Selector de idioma */}
-              <select
-                value={lang}
-                onChange={(e) => setLang(e.target.value as Language)}
-                className="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer hover:text-white hover:bg-slate-750 transition-colors font-semibold"
-              >
-                <option value="es">Español</option>
-                <option value="en">English</option>
-                <option value="ca">Català</option>
-                <option value="gl">Galego</option>
-              </select>
-
               <a
                 href="#about-us"
                 className="text-xs font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wider"
@@ -2669,7 +2979,7 @@ export default function App() {
               <button
                 onClick={() => {
                   setGuestMode(true);
-                  triggerAlert("info", lang === "es" ? "Has entrado en Modo Invitado. Los datos se guardarán localmente." : lang === "en" ? "You entered Guest Mode. Data will be saved locally." : lang === "ca" ? "Has entrat en Mode Convidat. Les dades es desaran localment." : "Entraches en Modo Invitado. Os datos gardaranse localmente.");
+                  triggerAlert("info", "Has entrado en Modo Invitado. Los datos se guardarán localmente.");
                 }}
                 className="text-xs font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wider cursor-pointer bg-transparent border-0"
               >
@@ -2721,7 +3031,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setGuestMode(true);
-                      triggerAlert("info", lang === "es" ? "Has entrado en Modo Invitado. Los datos se guardarán localmente." : lang === "en" ? "You entered Guest Mode. Data will be saved locally." : lang === "ca" ? "Has entrat en Mode Convidat. Les dades es desaran localment." : "Entraches en Modo Invitado. Os datos gardaranse localmente.");
+                  triggerAlert("info", "Has entrado en Modo Invitado. Los datos se guardarán localmente.");
                     }}
                     className="bg-slate-800/80 hover:bg-slate-850 active:scale-95 text-slate-200 font-bold text-sm px-6 py-4 rounded-xl border border-slate-700/60 transition-all shadow-sm cursor-pointer"
                   >
@@ -3144,17 +3454,6 @@ export default function App() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto justify-end">
-            {/* Selector de idioma */}
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value as Language)}
-              className="bg-white text-slate-700 border border-slate-200 rounded-lg text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer hover:bg-slate-50 transition-colors font-semibold"
-            >
-              <option value="es">Español</option>
-              <option value="en">English</option>
-              <option value="ca">Català</option>
-              <option value="gl">Galego</option>
-            </select>
             {/* CONTROL DE SINCRONIZACIÓN CLOUD / MÓVIL */}
             <div className="flex items-center gap-2">
               {!session?.user && guestMode && (
@@ -3483,7 +3782,7 @@ export default function App() {
                           const isChecked = shoppingCheckedItems.includes(item.id);
                           return (
                             <div key={item.id} className="py-3 flex items-center justify-between gap-4 text-xs">
-                              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                              <label className="flex items-start gap-2.5 cursor-pointer select-none flex-1">
                                 <input
                                   type="checkbox"
                                   checked={isChecked}
@@ -3492,19 +3791,33 @@ export default function App() {
                                       isChecked ? prev.filter(id => id !== item.id) : [...prev, item.id]
                                     );
                                   }}
-                                  className="w-4 h-4 rounded text-slate-700 border-slate-300 accent-slate-700"
+                                  className="w-4 h-4 rounded text-slate-700 border-slate-300 accent-slate-700 mt-0.5"
                                 />
-                                <span className={`font-semibold text-slate-850 ${isChecked ? "line-through text-slate-400" : ""}`}>
-                                  {item.name}
-                                </span>
-                                {!item.isCustom && (
-                                  <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
-                                    Stock: {item.quantity} {item.unit}
-                                  </span>
-                                )}
-                                <span className="text-[9px] px-2 py-0.5 rounded-full border font-bold" style={{ borderColor: getThemeHex(item.pantryTheme) + '44', color: getThemeHex(item.pantryTheme) }}>
-                                  {item.pantryName}
-                                </span>
+                                <div className="space-y-0.5">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`font-semibold text-slate-850 ${isChecked ? "line-through text-slate-400" : ""}`}>
+                                      {item.name}
+                                    </span>
+                                    {!item.isCustom && (
+                                      <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono">
+                                        Stock: {item.quantity} {item.unit}
+                                      </span>
+                                    )}
+                                    {item.deficitQty > 0 && (
+                                      <span className="text-[10px] bg-rose-50 text-rose-700 border border-rose-100 px-1.5 py-0.5 rounded font-mono font-semibold">
+                                        Faltan: {item.deficitQty} {item.unit}
+                                      </span>
+                                    )}
+                                    <span className="text-[9px] px-2 py-0.5 rounded-full border font-bold animate-fade-in" style={{ borderColor: getThemeHex(item.pantryTheme) + '44', color: getThemeHex(item.pantryTheme) }}>
+                                      {item.pantryName}
+                                    </span>
+                                  </div>
+                                  {item.reason && (
+                                    <p className="text-[10px] text-slate-400 font-semibold block animate-fade-in">
+                                      💡 {item.reason}
+                                    </p>
+                                  )}
+                                </div>
                               </label>
 
                               <div className="flex items-center gap-1.5">
@@ -4125,8 +4438,19 @@ export default function App() {
                   <span className="bg-emerald-500 text-emerald-50 text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full border border-emerald-400">
                     Sugerencias Inteligentes Gemini AI
                   </span>
-                  <h2 className="text-2xl sm:text-3xl font-black mt-2 tracking-tight">Chef de Inteligencia Artificial</h2>
-                  <p className="text-xs sm:text-sm text-emerald-100 font-medium">
+                  <div className="flex flex-wrap items-center gap-3 mt-2">
+                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight">Chef de Inteligencia Artificial</h2>
+                    {geminiUsage && (
+                      <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold font-mono border ${
+                        geminiUsage.remaining === 0 
+                          ? "bg-rose-500/20 text-rose-200 border-rose-500/30 animate-pulse" 
+                          : "bg-emerald-500/20 text-emerald-200 border-emerald-500/30"
+                      }`}>
+                        🤖 {geminiUsage.remaining} / {geminiUsage.limit} usos hoy
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs sm:text-sm text-emerald-100 font-medium mt-1">
                     Cocina de reaprovechamiento. Marca alimentos de tu despensa arriba o selecciona abajo qué deseas usar y nuestra IA creará la receta perfecta.
                   </p>
                 </div>
@@ -4347,13 +4671,47 @@ export default function App() {
                   </div>
                 )}
 
+                {/* Aviso de límite diario de IA */}
+                {geminiUsage && geminiUsage.remaining === 0 && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-5 space-y-4 animate-fade-in text-white">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-amber-500/20 rounded-lg text-amber-300 mt-0.5">
+                        <Sparkles className="w-4 h-4 animate-pulse" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-amber-300 tracking-wider">¡Límite diario de IA alcanzado!</h4>
+                        <p className="text-xs text-slate-200 mt-1 leading-relaxed">
+                          Has agotado el cupo gratuito de recetas generadas por IA del día ({geminiUsage.used}/{geminiUsage.limit}). 
+                          No te preocupes, puedes copiar un prompt preconfigurado con tus ingredientes para usarlo en tu propio LLM (como ChatGPT o Claude) e importar el JSON resultante de forma instantánea abajo.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      <button
+                        onClick={handleCopyAiPromptForExternalLLM}
+                        className="bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs uppercase px-4 py-2.5 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        📋 Copiar Prompt para tu LLM
+                      </button>
+                      
+                      <button
+                        onClick={() => setShowRecipeImporter(true)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs uppercase px-4 py-2.5 rounded-xl transition-all active:scale-95 flex items-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        📥 Importar Receta (JSON)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Acción de procesar */}
-                <div className="flex flex-wrap gap-4 items-center">
+                <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-3.5 w-full items-center">
                   <button
                     id="submit-ai-recipe"
-                    disabled={generatingRecipe}
+                    disabled={generatingRecipe || (geminiUsage !== null && geminiUsage.remaining === 0)}
                     onClick={() => handleGenerateRecipeWithIA(false)}
-                    className="bg-white text-emerald-800 disabled:bg-emerald-200 font-bold px-6 py-3 rounded-xl text-sm shadow-md flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+                    className="w-full sm:w-auto bg-white text-emerald-800 disabled:bg-emerald-200 disabled:text-emerald-800/60 font-bold px-5 py-3 rounded-xl text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
                   >
                     {generatingRecipe && !selectedProposal ? (
                       <>
@@ -4369,8 +4727,16 @@ export default function App() {
                   </button>
 
                   <button
+                    onClick={handleCopyAiPromptForExternalLLM}
+                    className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white font-bold px-5 py-3 rounded-xl text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer"
+                    title="Copiar prompt listo para usar en tu propio LLM (ChatGPT / Claude / etc.)"
+                  >
+                    Generar Prompt (Copiar) 📋
+                  </button>
+
+                  <button
                     onClick={() => setShowRecipeImporter(true)}
-                    className="bg-emerald-700/60 hover:bg-emerald-700/80 text-white border border-emerald-500/50 font-bold px-4 py-3 rounded-xl text-sm transition-all"
+                    className="w-full sm:w-auto bg-emerald-700/60 hover:bg-emerald-700/80 text-white border border-emerald-500/50 font-bold px-4 py-3 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
                     Importar desde web o notas 📥
                   </button>
@@ -4550,14 +4916,14 @@ export default function App() {
 
                 </div>
 
-                <div className="flex justify-end gap-3 border-t border-amber-200 pt-4 flex-wrap">
+                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 border-t border-amber-200 pt-4 w-full">
                   {recipeProposals && (
                     <button
                       onClick={() => {
                         setGeneratedRecipeDraft(null);
                         setSelectedProposal(null);
                       }}
-                      className="bg-slate-150 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shadow-3xs active:scale-95 transition-all cursor-pointer mr-auto"
+                      className="w-full sm:w-auto bg-slate-150 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1.5 shadow-3xs active:scale-95 transition-all cursor-pointer sm:mr-auto"
                     >
                       🔙 Volver a propuestas
                     </button>
@@ -4571,7 +4937,7 @@ export default function App() {
                           handleGenerateRecipeWithIA(true);
                         }
                       }}
-                      className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1 shadow-3xs active:scale-95 transition-all cursor-pointer"
+                      className="w-full sm:w-auto bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold px-4 py-2 rounded-lg text-xs flex items-center justify-center gap-1 shadow-3xs active:scale-95 transition-all cursor-pointer"
                     >
                       <RefreshCw className="w-3.5 h-3.5" /> Forzar Nueva Generación IA
                     </button>
@@ -4582,13 +4948,13 @@ export default function App() {
                       setSelectedProposal(null);
                       setRecipeProposals(null);
                     }}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-4 py-2 rounded-lg text-xs"
+                    className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-4 py-2 rounded-lg text-xs flex items-center justify-center cursor-pointer"
                   >
                     Descartar
                   </button>
                   <button
                     onClick={handleSaveRecipeDraft}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2 rounded-lg text-xs shadow-sm flex items-center gap-1"
+                    className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2 rounded-lg text-xs shadow-sm flex items-center justify-center gap-1 cursor-pointer"
                   >
                     <Check className="w-4 h-4" /> Guardar en mi Recetario
                   </button>

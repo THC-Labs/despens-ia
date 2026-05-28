@@ -1,0 +1,118 @@
+{
+  "inventory": [
+    {
+      "id": "1",
+      "name": "Arroz Integral",
+      "quantity": 1000,
+      "unit": "g",
+      "category": "Granos",
+      "last_updated": "2026-05-27T15:58:41.377Z"
+    },
+    {
+      "id": "2",
+      "name": "Pechuga de Pollo",
+      "quantity": 600,
+      "unit": "g",
+      "category": "Carnes",
+      "last_updated": "2026-05-27T15:58:41.377Z"
+    },
+    {
+      "id": "3",
+      "name": "Huevos Orgánicos",
+      "quantity": 12,
+      "unit": "uds",
+      "category": "Lácteos/Huevos",
+      "last_updated": "2026-05-27T15:58:41.377Z"
+    },
+    {
+      "id": "4",
+      "name": "Tomates frescos",
+      "quantity": 6,
+      "unit": "uds",
+      "category": "Verduras/Frutas",
+      "last_updated": "2026-05-27T15:58:41.377Z"
+    },
+    {
+      "id": "5",
+      "name": "Aguacate Maduro",
+      "quantity": 3,
+      "unit": "uds",
+      "category": "Verduras/Frutas",
+      "last_updated": "2026-05-27T15:58:41.377Z"
+    },
+    {
+      "id": "6",
+      "name": "Leche de Avena",
+      "quantity": 1000,
+      "unit": "ml",
+      "category": "Lácteos/Huevos",
+      "last_updated": "2026-05-27T15:58:41.377Z"
+    }
+  ],
+  "recipes": [
+    {
+      "id": "r1",
+      "title": "Fajitas de Pollo Fit",
+      "ingredients_required": [
+        {
+          "name": "Pechuga de Pollo",
+          "quantity": 250,
+          "unit": "g"
+        },
+        {
+          "name": "Tomates frescos",
+          "quantity": 2,
+          "unit": "uds"
+        },
+        {
+          "name": "Aguacate Maduro",
+          "quantity": 1,
+          "unit": "uds"
+        }
+      ],
+      "instructions": "1. Corta la pechuga de pollo y los tomates en tiras medianas.\n2. Cocina el pollo en una sartén caliente con especias y sal al gusto.\n3. Agrega los tomates al final de la cocción de modo que conserven cierta firmeza.\n4. Sirve en un plato adornando con rebanadas finas de aguacate maduro.",
+      "macros_summary": "380 kcal | P: 32g | C: 12g | G: 18g",
+      "created_at": "2026-05-27T15:58:41.377Z"
+    },
+    {
+      "id": "r2",
+      "title": "Tortilla Deportiva con Aguacate",
+      "ingredients_required": [
+        {
+          "name": "Huevos Orgánicos",
+          "quantity": 3,
+          "unit": "uds"
+        },
+        {
+          "name": "Aguacate Maduro",
+          "quantity": 0.5,
+          "unit": "uds"
+        }
+      ],
+      "instructions": "1. Bate los huevos en un plato hondo con sal y pimienta.\n2. Engrasa levemente una sartén caliente y vierte los huevos batidos.\n3. Deja cuajar y voltea con la ayuda de una espátula.\n4. Agrega el aguacate laminado en medio antes de doblar la tortilla y servir en caliente.",
+      "macros_summary": "320 kcal | P: 20g | C: 4g | G: 24g",
+      "created_at": "2026-05-27T15:58:41.377Z"
+    }
+  ],
+  "meal_plan": [
+    {
+      "id": "mp1",
+      "date": "2026-05-27",
+      "meal_type": "Comida",
+      "recipe_id": "r1",
+      "status": "planned"
+    },
+    {
+      "id": "mp2",
+      "date": "2026-05-27",
+      "meal_type": "Cena",
+      "recipe_id": "r2",
+      "status": "planned"
+    }
+  ],
+  "recipes_cache": [],
+  "ai_usage": {
+    "month": "2026-05",
+    "count": 1
+  }
+}

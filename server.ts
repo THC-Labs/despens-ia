@@ -151,6 +151,40 @@ function checkAndIncrementAiUsage(): boolean {
   }
 }
 
+function checkAndIncrementDailyAiUsage(userId: string): { allowed: boolean; remaining: number; max: number } {
+  try {
+    const db = readDb();
+    const today = new Date().toISOString().split("T")[0];
+
+    if (!db.daily_ai_usage) {
+      db.daily_ai_usage = {};
+    }
+
+    if (!db.daily_ai_usage[today]) {
+      db.daily_ai_usage = { [today]: {} };
+    }
+
+    const isGuest = !userId || userId === "guest";
+    const maxCalls = isGuest ? 1 : 4;
+
+    const currentCount = db.daily_ai_usage[today][userId] || 0;
+
+    if (currentCount >= maxCalls) {
+      console.warn(`[DAILY LIMIT EXCEEDED] Límite diario de llamadas superado para ${userId} (${currentCount}/${maxCalls}) en ${today}`);
+      return { allowed: false, remaining: 0, max: maxCalls };
+    }
+
+    db.daily_ai_usage[today][userId] = currentCount + 1;
+    writeDb(db);
+
+    console.log(`[DAILY LIMIT CHECK] Llamada registrada para ${userId}: ${currentCount + 1}/${maxCalls} para el día ${today}`);
+    return { allowed: true, remaining: maxCalls - (currentCount + 1), max: maxCalls };
+  } catch (err) {
+    console.error("Error al comprobar o guardar el contador de cuota diaria de IA:", err);
+    return { allowed: true, remaining: 1, max: 4 };
+  }
+}
+
 // ==========================================
 // RUTA REST API: INVENTARIO (inventory)
 // ==========================================
@@ -405,11 +439,12 @@ app.post("/api/gemini/recipe", async (req, res) => {
     prioritizeExpiringIngredients,
     action, // "propose" o "expand"
     selectedProposal, // la propuesta elegida al expandir
-    macroTargets // { calories, protein, carbs, fat }
+    macroTargets, // { calories, protein, carbs, fat }
+    userId // Identificador de usuario para cuota diaria
   } = req.body;
   
   console.log(`[Gemini Recipe] Ingredientes recibidos (Acción: ${action || "directa"}):`, JSON.stringify(selectedIngredients));
-  console.log("[Gemini Recipe] Preferencias y objetivos:", { allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients, prioritizeExpiringIngredients, macroTargets });
+  console.log("[Gemini Recipe] Preferencias y objetivos:", { allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients, prioritizeExpiringIngredients, macroTargets, userId });
 
   if (!selectedIngredients || selectedIngredients.length === 0) {
     return res.status(400).json({ error: "No seleccionaste ningún ingrediente de tu despensa." });
@@ -482,9 +517,35 @@ Asegúrate de ajustar los ingredientes y las porciones para intentar aproximarte
     }
   }
 
-  // Validar cuota de IA
-  if (!checkAndIncrementAiUsage()) {
-    return res.status(429).json({ error: "Se ha alcanzado el límite mensual de consultas de Inteligencia Artificial. Prueba de nuevo el próximo mes o apoya el proyecto indie." });
+  // Validar cuotas de IA (mensual y diaria)
+  if (action !== "expand") {
+    // 1. Validar cuota mensual global primero
+    if (!checkAndIncrementAiUsage()) {
+      return res.status(429).json({
+        error: "limit_reached",
+        message: "Se ha alcanzado el límite mensual de consultas de Inteligencia Artificial para la aplicación."
+      });
+    }
+
+    // 2. Validar cuota diaria por cuenta / IP
+    const uId = userId || "guest";
+    const dailyCheck = checkAndIncrementDailyAiUsage(uId);
+    if (!dailyCheck.allowed) {
+      return res.status(429).json({
+        error: "daily_limit_reached",
+        message: `Has alcanzado el límite diario de recetas generadas por IA (${dailyCheck.max} para tu cuenta). Puedes exportar el prompt para usar tu propio LLM.`,
+        limit: dailyCheck.max,
+        used: dailyCheck.max
+      });
+    }
+  } else {
+    // Para expandir, solo validamos la cuota mensual general
+    if (!checkAndIncrementAiUsage()) {
+      return res.status(429).json({
+        error: "limit_reached",
+        message: "Se ha alcanzado el límite mensual de consultas de Inteligencia Artificial para la aplicación."
+      });
+    }
   }
 
   try {
@@ -978,6 +1039,27 @@ app.post("/api/gemini/generate-recipe-image", async (req, res) => {
     // URL de placeholder amigable si la generación de imágenes por cuotas de API falla/no está de pago
     res.json({ imageUrl: `https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=400&q=80` });
   }
+});
+
+app.get("/api/gemini/usage-status", (req, res) => {
+  const userId = (req.query.userId as string) || "guest";
+  const db = readDb();
+  const today = new Date().toISOString().split("T")[0];
+  
+  if (!db.daily_ai_usage) {
+    db.daily_ai_usage = {};
+  }
+  
+  const isGuest = !userId || userId === "guest";
+  const max = isGuest ? 1 : 4;
+  
+  const used = (db.daily_ai_usage[today] && db.daily_ai_usage[today][userId]) || 0;
+  
+  res.json({
+    used: used,
+    limit: max,
+    remaining: Math.max(0, max - used)
+  });
 });
 
 app.get("/api/gemini/recipe-covers", (req, res) => {
