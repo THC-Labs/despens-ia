@@ -984,6 +984,29 @@ export default function App() {
   const [loadingProposals, setLoadingProposals] = useState(false);
   const [selectedProposal, setSelectedProposal] = useState<any | null>(null);
 
+  // --- PRIVACIDAD, NORMATIVAS Y COOKIES ---
+  const [showCookieBanner, setShowCookieBanner] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
+  useEffect(() => {
+    const consent = localStorage.getItem("despensia_cookie_consent");
+    if (!consent) {
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const lang = navigator.language || "";
+        const isRegulatoryArea = tz.startsWith("Europe/") || 
+                                 tz.startsWith("America/") || 
+                                 lang.startsWith("es") || 
+                                 lang.startsWith("en");
+        if (isRegulatoryArea) {
+          setShowCookieBanner(true);
+        }
+      } catch (e) {
+        setShowCookieBanner(true);
+      }
+    }
+  }, []);
+
   // (Estados y auto-guardado de Lista de la Compra se movieron al principio del componente)
 
   // --- IMPORTADOR DE RECETAS ---
@@ -3028,7 +3051,11 @@ export default function App() {
               <span className="font-sans font-black text-slate-300">Despensia</span>
             </div>
             <p>Despensia App 🍓 — Desarrollado por <strong>THC Labs</strong>. Proyecto indie y sin financiación externa. Si te gusta, colabora <a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">apoyándonos en Ko-fi</a> o compartiendo la app.</p>
-            <p className="text-[10px] text-slate-600">THC Labs 2026. Todos los derechos reservados.</p>
+            <p className="text-[10px] text-slate-600 flex justify-center items-center gap-3 flex-wrap">
+              <span>THC Labs 2026. Todos los derechos reservados.</span>
+              <span>•</span>
+              <button onClick={() => setShowPrivacyModal(true)} className="hover:underline hover:text-slate-400 cursor-pointer">Política de Privacidad y Cookies</button>
+            </p>
           </div>
         </footer>
       </div>
@@ -5084,7 +5111,11 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 space-y-1.5">
           <p>Despensia App 🍓 — Desarrollado por <strong>THC Labs</strong>.</p>
           <p className="text-[10px] text-slate-450 leading-relaxed">Este es un proyecto independiente (indie) desarrollado sin financiación. Si te gusta y deseas colaborar, ¡<a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline font-bold">apóyanos en Ko-fi</a> o comparte la app!</p>
-          <p className="text-[9px] text-slate-300">THC Labs 2026. Todos los derechos reservados.</p>
+          <p className="text-[9px] text-slate-300 flex justify-center items-center gap-3 flex-wrap">
+            <span>THC Labs 2026. Todos los derechos reservados.</span>
+            <span>•</span>
+            <button onClick={() => setShowPrivacyModal(true)} className="hover:underline hover:text-slate-500 cursor-pointer">Privacidad, Cookies y Términos</button>
+          </p>
         </div>
       </footer>
 
@@ -5528,6 +5559,115 @@ export default function App() {
       
       {guestMode && (
         <div className="hidden" /> // placeholder
+      )}
+
+      {/* AVISO DE COOKIES (NO INTRUSIVO, DIVERTIDO Y COMPLIANT) */}
+      {showCookieBanner && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full bg-white/90 backdrop-blur-md border border-slate-200/80 p-5 rounded-2xl shadow-xl animate-fade-in flex flex-col gap-3 text-left">
+          <div className="flex items-start gap-2.5">
+            <span className="text-2xl">🍪</span>
+            <div className="space-y-1">
+              <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider">¿Un mordisquito a las cookies?</h4>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                En Despensia usamos cookies técnicas y almacenamiento local para que la app recuerde tus ingredientes y no se te queme la comida. No engordan ni rastrean tu alma. ¿Te parece bien?
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2.5 pt-1">
+            <button
+              onClick={() => {
+                localStorage.setItem("despensia_cookie_consent", "necessary");
+                setShowCookieBanner(false);
+                triggerAlert("info", "Preferencias guardadas: solo cookies necesarias.");
+              }}
+              className="text-[10px] font-bold text-slate-500 hover:text-slate-700 px-3 py-2 uppercase tracking-wide cursor-pointer"
+            >
+              Solo las obligatorias 🔒
+            </button>
+            <button
+              onClick={() => {
+                localStorage.setItem("despensia_cookie_consent", "all");
+                setShowCookieBanner(false);
+                triggerAlert("success", "¡Gracias! Cookies aceptadas con gusto 🍳");
+              }}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[10px] px-4 py-2 rounded-lg uppercase tracking-wide shadow-sm active:scale-95 transition-all cursor-pointer"
+            >
+              ¡Acepto todo! 🍳
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE POLÍTICA DE PRIVACIDAD, COOKIES Y TÉRMINOS */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 border border-slate-100 shadow-2xl relative animate-fade-in text-left space-y-6 max-h-[85vh] overflow-y-auto">
+            <button
+              onClick={() => setShowPrivacyModal(false)}
+              className="absolute top-5 right-5 text-slate-400 hover:text-slate-600 text-sm font-black p-1 hover:bg-slate-50 rounded-full cursor-pointer"
+              title="Cerrar"
+            >
+              ✕
+            </button>
+
+            <div className="space-y-1.5 border-b border-slate-100 pb-3">
+              <span className="bg-emerald-100 text-emerald-800 text-[9px] uppercase font-bold tracking-widest px-2.5 py-0.5 rounded-full border border-emerald-200">
+                Transparencia THC Labs
+              </span>
+              <h3 className="text-xl font-black text-slate-800 tracking-tight">Política de Privacidad, Cookies y Términos</h3>
+            </div>
+
+            <div className="space-y-4.5 text-xs text-slate-600 leading-relaxed overflow-y-auto">
+              <section className="space-y-1">
+                <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[10px]">1. ¿Quiénes somos?</h4>
+                <p>
+                  Esta aplicación es un proyecto independiente (indie) desarrollado por <strong>THC Labs</strong>. Si tienes dudas, sugerencias o quieres solicitar la eliminación de tus datos, puedes contactarnos directamente en <a href="mailto:didacwm@gmail.com" className="text-emerald-600 font-bold hover:underline">didacwm@gmail.com</a>.
+                </p>
+              </section>
+
+              <section className="space-y-1">
+                <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[10px]">2. ¿Qué datos recopilamos y para qué?</h4>
+                <p>
+                  Recopilamos únicamente el <strong>correo electrónico</strong> y la contraseña cifrada cuando te registras en la nube (a través de Supabase). Estos datos sirven exclusivamente para que puedas sincronizar tu inventario y planificador de menús en varios dispositivos. No compartimos tus datos con anunciantes ni comerciamos con ellos.
+                </p>
+              </section>
+
+              <section className="space-y-1">
+                <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[10px]">3. Uso de Inteligencia Artificial (Gemini)</h4>
+                <p>
+                  Para sugerir recetas y procesar tickets, enviamos exclusivamente los datos estrictamente necesarios (el listado de ingredientes de tu despensa y las notas adicionales) a la API de **Google Gemini**. No enviamos tu correo electrónico ni ningún dato personal identificable a los servidores de Google.
+                </p>
+              </section>
+
+              <section className="space-y-1">
+                <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[10px]">4. Uso de Cookies y Almacenamiento</h4>
+                <p>
+                  Cumplimos con la normativa RGPD/GDPR de la UE y las directivas de privacidad:
+                </p>
+                <ul className="list-disc list-inside space-y-1 pl-1">
+                  <li><strong>Cookies Técnicas Obligatorias</strong>: Usamos el almacenamiento local de tu navegador para mantener iniciada tu sesión y guardar tus preferencias de tema o filtrados locales (sin estas la app no funcionaría).</li>
+                  <li><strong>Cookies Analíticas / Publicitarias</strong>: **No** implementamos ningún sistema de cookies de terceros, píxeles de rastreo de redes sociales (Facebook/Meta) ni Google Analytics. Tu privacidad es 100% tuya.</li>
+                </ul>
+              </section>
+
+              <section className="space-y-1">
+                <h4 className="font-extrabold text-slate-800 uppercase tracking-wider text-[10px]">5. Derechos de Usuario (RGPD)</h4>
+                <p>
+                  Tienes derecho a acceder, corregir o borrar tus datos en cualquier momento. Si quieres eliminar tu cuenta de forma definitiva y borrar todo tu inventario del servidor en la nube, puedes hacerlo escribiendo a <a href="mailto:didacwm@gmail.com" className="text-emerald-600 font-bold hover:underline">didacwm@gmail.com</a> y procesaremos tu baja inmediatamente.
+                </p>
+              </section>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setShowPrivacyModal(false)}
+                className="bg-slate-800 hover:bg-slate-700 text-white font-extrabold text-xs px-6 py-2.5 rounded-xl shadow-md uppercase tracking-wider active:scale-95 transition-all cursor-pointer"
+              >
+                Entendido y Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
