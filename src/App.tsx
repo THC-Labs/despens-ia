@@ -2489,8 +2489,25 @@ export default function App() {
         <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-900/30">
-                <CookingPot className="w-5 h-5 animate-pulse" />
+              <div className="relative p-2 bg-emerald-600 rounded-xl text-white shadow-lg shadow-emerald-900/30 w-10 h-10 flex items-center justify-center overflow-hidden">
+                {/* Falling ingredients */}
+                <span className="absolute text-[10px] select-none pointer-events-none falling-ing-1">🥕</span>
+                <span className="absolute text-[10px] select-none pointer-events-none falling-ing-2">🍅</span>
+                <span className="absolute text-[10px] select-none pointer-events-none falling-ing-3">🥦</span>
+                
+                {/* Custom animated cooking pot */}
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 z-10">
+                  {/* Lid (Rattling) */}
+                  <g className="animate-lid">
+                    <path d="M10 5h4" />
+                    <path d="M12 3v2" />
+                    <path d="M4 8h16" />
+                    <path d="M5 8c0-1.5 1-3 3-3h8c2 0 3 1.5 3 3" />
+                  </g>
+                  {/* Pot body (rim & bowl) */}
+                  <path d="M2 11h20" />
+                  <path d="M19 11v7c0 2-2 3-4 3H9c-2 0-4-1-4-3v-7" />
+                </svg>
               </div>
               <span className="text-xl font-black tracking-tight text-white">Despensia</span>
             </div>
@@ -2940,8 +2957,25 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-4">
           
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-emerald-600 rounded-xl text-white shadow-md shadow-emerald-200">
-              <CookingPot className="w-6 h-6 animate-bounce" />
+            <div className="relative p-2 bg-emerald-600 rounded-xl text-white shadow-md shadow-emerald-200 w-11 h-11 flex items-center justify-center overflow-hidden">
+              {/* Falling ingredients */}
+              <span className="absolute text-xs select-none pointer-events-none falling-ing-1">🥕</span>
+              <span className="absolute text-xs select-none pointer-events-none falling-ing-2">🍅</span>
+              <span className="absolute text-xs select-none pointer-events-none falling-ing-3">🥦</span>
+              
+              {/* Custom animated cooking pot */}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 z-10">
+                {/* Lid (Rattling) */}
+                <g className="animate-lid">
+                  <path d="M10 5h4" />
+                  <path d="M12 3v2" />
+                  <path d="M4 8h16" />
+                  <path d="M5 8c0-1.5 1-3 3-3h8c2 0 3 1.5 3 3" />
+                </g>
+                {/* Pot body (rim & bowl) */}
+                <path d="M2 11h20" />
+                <path d="M19 11v7c0 2-2 3-4 3H9c-2 0-4-1-4-3v-7" />
+              </svg>
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -2949,6 +2983,11 @@ export default function App() {
                 <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
                   <Sparkles className="w-3 h-3 text-emerald-600" /> IA Powered
                 </span>
+                {activePantry && (
+                  <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Warehouse className="w-3 h-3 text-emerald-600" /> {activePantry.name}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 font-medium">Gestión inteligente de alimentos y cocina en vivo</p>
             </div>
