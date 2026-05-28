@@ -394,10 +394,22 @@ app.get("/api/gemini/test", async (req, res) => {
 // RUTA DE IA: GENERAR RECETA CON GEMINI
 // ==========================================
 app.post("/api/gemini/recipe", async (req, res) => {
-  const { selectedIngredients, extraPrompt, allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients, prioritizeExpiringIngredients } = req.body;
+  const { 
+    selectedIngredients, 
+    extraPrompt, 
+    allergies, 
+    preferences, 
+    cookingStyle, 
+    forceRegenerate, 
+    useOnlyPantryIngredients, 
+    prioritizeExpiringIngredients,
+    action, // "propose" o "expand"
+    selectedProposal, // la propuesta elegida al expandir
+    macroTargets // { calories, protein, carbs, fat }
+  } = req.body;
   
-  console.log("[Gemini Recipe] Ingredientes recibidos:", JSON.stringify(selectedIngredients));
-  console.log("[Gemini Recipe] Preferencias:", { allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients, prioritizeExpiringIngredients });
+  console.log(`[Gemini Recipe] Ingredientes recibidos (Acción: ${action || "directa"}):`, JSON.stringify(selectedIngredients));
+  console.log("[Gemini Recipe] Preferencias y objetivos:", { allergies, preferences, cookingStyle, forceRegenerate, useOnlyPantryIngredients, prioritizeExpiringIngredients, macroTargets });
 
   if (!selectedIngredients || selectedIngredients.length === 0) {
     return res.status(400).json({ error: "No seleccionaste ningún ingrediente de tu despensa." });
@@ -422,12 +434,38 @@ app.post("/api/gemini/recipe", async (req, res) => {
   const preferencesStr = preferences && preferences.length > 0 ? preferences.join(", ") : "Ninguna";
   const cookingStyleStr = cookingStyle || "Saludable y Balanceada";
 
-  // Generar clave única para la caché de recetas basada en inputs
+  // Formatear objetivos de macros para el prompt
+  const hasMacroTargets = macroTargets && (macroTargets.calories || macroTargets.protein || macroTargets.carbs || macroTargets.fat);
+  const macroTargetsPromptStr = hasMacroTargets 
+    ? `Objetivos Nutricionales Diarios Deseados por el Usuario para esta receta:
+- Calorías: ${macroTargets.calories ? `~${macroTargets.calories} kcal` : "Sin especificar"}
+- Proteínas: ${macroTargets.protein ? `~${macroTargets.protein} g` : "Sin especificar"}
+- Carbohidratos: ${macroTargets.carbs ? `~${macroTargets.carbs} g` : "Sin especificar"}
+- Grasas: ${macroTargets.fat ? `~${macroTargets.fat} g` : "Sin especificar"}
+Asegúrate de ajustar los ingredientes y las porciones para intentar aproximarte lo mejor posible a estos valores indicados.`
+    : "Sin objetivos nutricionales específicos (hazla equilibrada).";
+
+  // Generar clave única para la caché
   const sortedNames = [...selectedIngredients]
     .map((item: any) => `${item.name.trim().toLowerCase()}:${item.quantity}${item.unit}`)
     .sort()
     .join("|");
-  const cacheKeyInput = `ingredients:${sortedNames};allergies:${allergiesStr.toLowerCase()};preferences:${preferencesStr.toLowerCase()};style:${cookingStyleStr.toLowerCase()};extra:${(extraPrompt || "").trim().toLowerCase()};onlyPantry:${!!useOnlyPantryIngredients};prioritizeExpiring:${!!prioritizeExpiringIngredients}`;
+  
+  const macroTargetsKeyStr = macroTargets 
+    ? `cal:${macroTargets.calories || 0};prot:${macroTargets.protein || 0};carb:${macroTargets.carbs || 0};fat:${macroTargets.fat || 0}` 
+    : "no-macros";
+
+  let cacheKeyInput = "";
+  if (action === "propose") {
+    cacheKeyInput = `action:propose;ingredients:${sortedNames};allergies:${allergiesStr.toLowerCase()};preferences:${preferencesStr.toLowerCase()};style:${cookingStyleStr.toLowerCase()};extra:${(extraPrompt || "").trim().toLowerCase()};onlyPantry:${!!useOnlyPantryIngredients};prioritizeExpiring:${!!prioritizeExpiringIngredients};macros:${macroTargetsKeyStr}`;
+  } else if (action === "expand") {
+    const propTitle = selectedProposal?.title || "";
+    cacheKeyInput = `action:expand;title:${propTitle.toLowerCase()};ingredients:${sortedNames};allergies:${allergiesStr.toLowerCase()};preferences:${preferencesStr.toLowerCase()};style:${cookingStyleStr.toLowerCase()};extra:${(extraPrompt || "").trim().toLowerCase()};macros:${macroTargetsKeyStr}`;
+  } else {
+    // Antigua acción directa
+    cacheKeyInput = `ingredients:${sortedNames};allergies:${allergiesStr.toLowerCase()};preferences:${preferencesStr.toLowerCase()};style:${cookingStyleStr.toLowerCase()};extra:${(extraPrompt || "").trim().toLowerCase()};onlyPantry:${!!useOnlyPantryIngredients};prioritizeExpiring:${!!prioritizeExpiringIngredients}`;
+  }
+
   const cacheKey = crypto.createHash("md5").update(cacheKeyInput).digest("hex");
 
   const db = readDb();
@@ -435,21 +473,191 @@ app.post("/api/gemini/recipe", async (req, res) => {
     db.recipes_cache = [];
   }
 
-  // Si no se fuerza la regeneración, comprobar caché
+  // Comprobar caché si no es forzada
   if (!forceRegenerate) {
     const cached = db.recipes_cache.find((item: any) => item.key === cacheKey);
     if (cached) {
-      console.log(`[CACHE HIT] Retornando receta guardada en caché para key: ${cacheKey}`);
-      return res.json(cached.recipe);
+      console.log(`[CACHE HIT] Retornando de caché para key: ${cacheKey}`);
+      return res.json({ ...cached.recipe, _cached: true });
     }
   }
 
-  // Validar y descontar cuota mensual de IA
+  // Validar cuota de IA
   if (!checkAndIncrementAiUsage()) {
-    return res.status(429).json({ error: "Se ha alcanzado el límite mensual de consultas de Inteligencia Artificial. Prueba de nuevo el próximo mes o contacta al administrador." });
+    return res.status(429).json({ error: "Se ha alcanzado el límite mensual de consultas de Inteligencia Artificial. Prueba de nuevo el próximo mes o apoya el proyecto indie." });
   }
 
-  const prompt = `Actúa como un chef profesional y diseñador de planes alimenticios saludables.
+  try {
+    const ai = getGenAIClient();
+
+    if (action === "propose") {
+      // ==========================================
+      // CASO A: GENERAR 3 PROPUESTAS DE RECETA
+      // ==========================================
+      const prompt = `Actúa como un chef profesional y diseñador de menús interactivos.
+Tengo los siguientes ingredientes disponibles en mi despensa:
+${ingredientsListStr}
+
+Restricciones y Preferencias:
+- Alergias/Intolerancias: ${allergiesStr}. EXCLUYE estrictamente estos alérgenos de todas las propuestas.
+- Preferencias de dieta: ${preferencesStr}.
+- Estilo de cocina: ${cookingStyleStr}.
+${extraPrompt ? `- Comentarios adicionales del usuario: "${extraPrompt}"` : ""}
+
+${macroTargetsPromptStr}
+
+Propón exactamente 3 opciones de recetas deliciosas, creativas y diferentes que se puedan hacer con estos ingredientes.
+Debes clasificar cada una de las 3 opciones bajo una de estas categorías obligatoriamente:
+1. "aprovechamiento": Una receta rápida y directa que use exclusivamente o casi en su totalidad los ingredientes que ya tengo en la despensa.
+   - Tagline descriptivo: "Rápida con lo que tienes"
+   - missingIngredients: Debe ser una lista vacía [].
+2. "supermercado": Una receta que aproveche los ingredientes en despensa, pero recomiende añadir 2 o 3 ingredientes clave que no tengo (por ejemplo, sugiriendo comprar nata, jengibre o pollo si faltaran).
+   - Tagline descriptivo: "¿Tienes tiempo para ir al súper? haz esto"
+   - missingIngredients: Lista de 1 a 3 ingredientes principales a comprar.
+3. "innovar": Una receta creativa, exótica o con un giro divertido. Puede ser un estilo de preparación inusual o combinación de sabores novedosa, usando los ingredientes de la despensa y opcionalmente sugiriendo 1 o 2 ingredientes extra si hicieran falta para el toque Gourmet.
+   - Tagline descriptivo: "¿Quieres innovar? prueba esto"
+   - missingIngredients: Lista opcional de ingredientes extra que aportarían ese toque innovador (pueden ser condimentos, salsas o complementos).
+
+Devuelve la respuesta estrictamente en un array JSON plano con 3 objetos con la siguiente estructura exacta:
+[
+  {
+    "type": "aprovechamiento" | "supermercado" | "innovar",
+    "tagline": "Rápida con lo que tienes" | "¿Tienes tiempo para ir al súper? haz esto" | "¿Quieres innovar? prueba esto",
+    "title": "Nombre creativo de la receta",
+    "description": "Una breve descripción de 1-2 frases atractivas en español explicando en qué consiste y por qué vale la pena.",
+    "missingIngredients": ["Ingrediente faltante 1", "Ingrediente faltante 2"]
+  }
+]`;
+
+      const response = await ai.models.generateContent({
+        model: MODEL_NAME,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                type: { type: Type.STRING },
+                tagline: { type: Type.STRING },
+                title: { type: Type.STRING },
+                description: { type: Type.STRING },
+                missingIngredients: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                }
+              },
+              required: ["type", "tagline", "title", "description", "missingIngredients"]
+            }
+          }
+        }
+      });
+
+      const bodyText = response.text ? response.text.trim() : "";
+      if (!bodyText) throw new Error("Respuesta vacía al generar propuestas.");
+      
+      const parsed = JSON.parse(bodyText);
+
+      // Guardar en la caché local del servidor
+      const dbUpdate = readDb();
+      if (!dbUpdate.recipes_cache) dbUpdate.recipes_cache = [];
+      dbUpdate.recipes_cache.push({
+        key: cacheKey,
+        recipe: { proposals: parsed },
+        created_at: new Date().toISOString()
+      });
+      writeDb(dbUpdate);
+
+      return res.json({ proposals: parsed });
+
+    } else if (action === "expand") {
+      // ==========================================
+      // CASO B: EXPANDIR PROPUESTA ELEGIDA A RECETA COMPLETA
+      // ==========================================
+      const { title, type, tagline, description, missingIngredients } = selectedProposal;
+      
+      const prompt = `Actúa como un chef profesional y redactor de recetarios detallados.
+El usuario ha elegido expandir la siguiente propuesta de receta:
+- Título: ${title}
+- Tipo de propuesta: ${type} (${tagline})
+- Descripción inicial: ${description}
+- Ingredientes a comprar sugeridos (si aplica): ${missingIngredients && missingIngredients.length > 0 ? missingIngredients.join(", ") : "Ninguno"}
+
+Ingredientes que el usuario tiene disponibles en su despensa:
+${ingredientsListStr}
+
+Restricciones y Preferencias de Salud/Dieta del Usuario:
+- Alergias/Intolerancias alimenticias: ${allergiesStr}. EXCLUYE estrictamente estos alérgenos de la receta.
+- Preferencias de gustos/ingredientes: ${preferencesStr}.
+- Estilo de cocina deseado: ${cookingStyleStr}.
+${macroTargetsPromptStr}
+
+Crea la receta detallada completa para "${title}".
+Debes asumir que el usuario tiene o comprará los ingredientes faltantes listados en la propuesta, por lo que deben figurar en la lista final de ingredientes requeridos.
+
+Devuelve la respuesta en formato JSON con la siguiente estructura:
+{
+  "title": "Nombre definitivo de la receta en español",
+  "ingredients_required": [
+    {"name": "Nombre exacto del ingrediente", "quantity": "cantidad (ej: 250, 2, al gusto)", "unit": "unidad (ej: g, uds, ml, cucharadas)"}
+  ],
+  "instructions": "Instrucciones de preparación numeradas y claras paso a paso. Sé detallado y profesional en la explicación.",
+  "macros_summary": "Resumen estimado de macros (ej: '510 kcal | Proteínas: 32g | Carbohidratos: 45g | Grasas: 18g')"
+}
+Responde en español y devuelve exclusivamente el objeto JSON válido.`;
+
+      const response = await ai.models.generateContent({
+        model: MODEL_NAME,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              ingredients_required: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    quantity: { type: Type.STRING },
+                    unit: { type: Type.STRING }
+                  },
+                  required: ["name", "quantity", "unit"]
+                }
+              },
+              instructions: { type: Type.STRING },
+              macros_summary: { type: Type.STRING }
+            },
+            required: ["title", "ingredients_required", "instructions", "macros_summary"]
+          }
+        }
+      });
+
+      const bodyText = response.text ? response.text.trim() : "";
+      if (!bodyText) throw new Error("Respuesta vacía al expandir propuesta.");
+
+      const parsed = JSON.parse(bodyText);
+
+      // Guardar en la caché local del servidor
+      const dbUpdate = readDb();
+      if (!dbUpdate.recipes_cache) dbUpdate.recipes_cache = [];
+      dbUpdate.recipes_cache.push({
+        key: cacheKey,
+        recipe: parsed,
+        created_at: new Date().toISOString()
+      });
+      writeDb(dbUpdate);
+
+      return res.json(parsed);
+
+    } else {
+      // ==========================================
+      // CASO C: COMPATIBILIDAD ANTERIOR (DIRECTA)
+      // ==========================================
+      const prompt = `Actúa como un chef profesional y diseñador de planes alimenticios saludables.
 Tengo los siguientes ingredientes disponibles en mi despensa:
 ${ingredientsListStr}
 
@@ -457,15 +665,13 @@ Restricciones y Preferencias de Salud/Dieta del Usuario:
 - Alergias/Intolerancias alimenticias: ${allergiesStr}. EXCLUYE estrictamente estos alérgenos e intolerancias de la receta.
 - Preferencias de gustos/ingredientes: ${preferencesStr}.
 - Estilo de cocina deseado: ${cookingStyleStr}.
-
 ${extraPrompt ? `Instrucciones o preferencias adicionales del usuario: "${extraPrompt}"` : ""}
 
   ${useOnlyPantryIngredients ? `REGLA DE ORO CRÍTICA: La receta debe contener EXCLUSIVAMENTE los ingredientes listados arriba de tu despensa. No agregues ningún otro ingrediente, condimento, especia o grasa (como aceite) que no figure en la lista (puedes asumir únicamente agua y sal común si son indispensables para la preparación, pero nada más).` : ""}
-
   ${prioritizeExpiringIngredients ? `REGLA DE REAPROVECHAMIENTO CRÍTICA: Los ingredientes listados arriba que tienen la marca "[PRÓXIMO A CADUCAR]" están muy cerca de vencer. Debes priorizar el uso obligatorio de estos ingredientes en la receta para evitar el desperdicio.` : ""}
 
   Crea una receta deliciosa, creativa y balanceada utilizando todos o algunos de estos ingredientes. 
-  Devuelve la respuesta strictly en formato JSON con la siguiente estructura (no agregues texto fuera de esta estructura JSON):
+  Devuelve la respuesta en formato JSON con la siguiente estructura:
 {
   "title": "Nombre creativo e inspirador de la receta (en español)",
   "ingredients_required": [
@@ -474,52 +680,45 @@ ${extraPrompt ? `Instrucciones o preferencias adicionales del usuario: "${extraP
   "instructions": "Instrucciones numeradas en pasos claros y concisos (ejemplo: '1. Calentar sartén... \\n2. Añadir verduras...').",
   "macros_summary": "Un resumen estimado de macros como '420 kcal | Proteínas: 28g | Carbohidratos: 45g | Grasas: 14g'"
 }
+Responde en español y devuelve directamente el objeto JSON válido.`;
 
-Asegúrate de responder en español. No introduzcas marcas de código como \`\`\`json ni nada de eso. Devuelve directamente el objeto JSON válido.`;
-
-  try {
-    const response = await getGenAIClient().models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            ingredients_required: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  quantity: { type: Type.STRING },
-                  unit: { type: Type.STRING }
-                },
-                required: ["name", "quantity", "unit"]
-              }
+      const response = await ai.models.generateContent({
+        model: MODEL_NAME,
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              ingredients_required: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING },
+                    quantity: { type: Type.STRING },
+                    unit: { type: Type.STRING }
+                  },
+                  required: ["name", "quantity", "unit"]
+                }
+              },
+              instructions: { type: Type.STRING },
+              macros_summary: { type: Type.STRING }
             },
-            instructions: { type: Type.STRING },
-            macros_summary: { type: Type.STRING }
-          },
-          required: ["title", "ingredients_required", "instructions", "macros_summary"]
+            required: ["title", "ingredients_required", "instructions", "macros_summary"]
+          }
         }
-      }
-    });
+      });
 
-    const bodyText = response.text ? response.text.trim() : "";
-    if (!bodyText) {
-      throw new Error("Respuesta vacía de Gemini.");
-    }
+      const bodyText = response.text ? response.text.trim() : "";
+      if (!bodyText) throw new Error("Respuesta vacía de Gemini.");
 
-    try {
       const parsed = JSON.parse(bodyText);
 
       // Guardar en la caché local
       const dbUpdate = readDb();
-      if (!dbUpdate.recipes_cache) {
-        dbUpdate.recipes_cache = [];
-      }
+      if (!dbUpdate.recipes_cache) dbUpdate.recipes_cache = [];
       dbUpdate.recipes_cache.push({
         key: cacheKey,
         recipe: parsed,
@@ -527,16 +726,7 @@ Asegúrate de responder en español. No introduzcas marcas de código como \`\`\
       });
       writeDb(dbUpdate);
 
-      res.json(parsed);
-    } catch (parseError) {
-      console.error("Fallo al parsear JSON devuelto por Gemini:", bodyText);
-      // Fallback
-      res.json({
-        title: "Sugerencia Inteligente Express",
-        ingredients_required: selectedIngredients.map((it: any) => ({ name: it.name, quantity: "al gusto", unit: "" })),
-        instructions: "1. Mezcla los ingredientes seleccionados de forma armoniosa en una cacerola u horno.\n2. Cocina a temperatura media vigilando el punto.\n3. Añade condimentos extras para realzar el sabor y sirve caliente.",
-        macros_summary: "Macros Estimados: 350 kcal | Modificable basado en porciones exactas."
-      });
+      return res.json(parsed);
     }
   } catch (err: any) {
     console.error("Error al llamar a Gemini API:", err);

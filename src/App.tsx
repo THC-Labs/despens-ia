@@ -975,6 +975,15 @@ export default function App() {
   const [chefSearchQuery, setChefSearchQuery] = useState("");
   const [showChefSearchDropdown, setShowChefSearchDropdown] = useState(false);
 
+  // --- CHEF IA: PROPUESTAS Y METAS DE MACROS ---
+  const [macroCal, setMacroCal] = useState<number | "">("");
+  const [macroProt, setMacroProt] = useState<number | "">("");
+  const [macroCarb, setMacroCarb] = useState<number | "">("");
+  const [macroFat, setMacroFat] = useState<number | "">("");
+  const [recipeProposals, setRecipeProposals] = useState<any[] | null>(null);
+  const [loadingProposals, setLoadingProposals] = useState(false);
+  const [selectedProposal, setSelectedProposal] = useState<any | null>(null);
+
   // (Estados y auto-guardado de Lista de la Compra se movieron al principio del componente)
 
   // --- IMPORTADOR DE RECETAS ---
@@ -1735,7 +1744,9 @@ export default function App() {
     }
 
     setGeneratingRecipe(true);
+    setRecipeProposals(null);
     setGeneratedRecipeDraft(null);
+    setSelectedProposal(null);
 
     try {
       // Filtrar alimentos completos que están seleccionados (incluyendo personalizados)
@@ -1765,7 +1776,90 @@ export default function App() {
           cookingStyle: profilePrefs.cookingStyle,
           forceRegenerate: force === true,
           useOnlyPantryIngredients: useOnlyPantryIngredients,
-          prioritizeExpiringIngredients: prioritizeExpiringIngredients
+          prioritizeExpiringIngredients: prioritizeExpiringIngredients,
+          action: "propose",
+          macroTargets: {
+            calories: macroCal || undefined,
+            protein: macroProt || undefined,
+            carbs: macroCarb || undefined,
+            fat: macroFat || undefined
+          }
+        })
+      });
+
+      if (res.status === 429) {
+        const errorData = await res.json().catch(() => ({}));
+        triggerAlert("error", errorData.error || "Se ha excedido el límite de llamadas mensuales a Gemini.");
+        return;
+      }
+
+      if (res.ok) {
+        const result = await res.json();
+        if (result.proposals) {
+          setRecipeProposals(result.proposals);
+          if (result._cached) {
+            triggerAlert("info", "Propuestas servidas al instante desde la caché (sin consumir créditos).");
+          } else {
+            triggerAlert("success", "Hemos formulado 3 propuestas basadas en tu despensa. ¡Elige una!");
+          }
+        } else {
+          setGeneratedRecipeDraft(result);
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        const detailedMsg = errorData.error
+          ? `${errorData.error}${errorData.details ? ` (${errorData.details})` : ""}`
+          : "Error al formular la propuesta culinaria con Gemini.";
+        triggerAlert("error", detailedMsg);
+      }
+    } catch (err) {
+      triggerAlert("error", "Error de red conectando con Gemini.");
+    } finally {
+      setGeneratingRecipe(false);
+    }
+  };
+
+  const handleExpandProposal = async (proposal: any, force: boolean = false) => {
+    setGeneratingRecipe(true);
+    setSelectedProposal(proposal);
+    setGeneratedRecipeDraft(null);
+
+    try {
+      const itemsSelected = selectedForRecipe.map(name => {
+        const inventoryItem = activeInventory.find(it => it.name.toLowerCase() === name.toLowerCase());
+        return inventoryItem ? {
+          name: inventoryItem.name,
+          quantity: inventoryItem.quantity,
+          unit: inventoryItem.unit,
+          expiryDate: inventoryItem.expiryDate || ""
+        } : {
+          name: name,
+          quantity: 0,
+          unit: "",
+          expiryDate: ""
+        };
+      });
+
+      const res = await fetch("/api/gemini/recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selectedIngredients: itemsSelected,
+          extraPrompt: chefExtraPrompt,
+          allergies: profilePrefs.allergies,
+          preferences: profilePrefs.preferences,
+          cookingStyle: profilePrefs.cookingStyle,
+          forceRegenerate: force === true,
+          useOnlyPantryIngredients: useOnlyPantryIngredients,
+          prioritizeExpiringIngredients: prioritizeExpiringIngredients,
+          action: "expand",
+          selectedProposal: proposal,
+          macroTargets: {
+            calories: macroCal || undefined,
+            protein: macroProt || undefined,
+            carbs: macroCarb || undefined,
+            fat: macroFat || undefined
+          }
         })
       });
 
@@ -1781,14 +1875,11 @@ export default function App() {
         if (recipeResult._cached) {
           triggerAlert("info", "Receta servida al instante desde la caché (sin consumir créditos).");
         } else {
-          triggerAlert("success", `Receta "${recipeResult.title}" redactada por Chef Gemini.`);
+          triggerAlert("success", `Receta "${recipeResult.title}" expandida redactada por Chef Gemini.`);
         }
       } else {
         const errorData = await res.json().catch(() => ({}));
-        const detailedMsg = errorData.error
-          ? `${errorData.error}${errorData.details ? ` (${errorData.details})` : ""}`
-          : "Error al formular la propuesta culinaria con Gemini.";
-        triggerAlert("error", detailedMsg);
+        triggerAlert("error", errorData.error || "Error al expandir la propuesta culinaria con Gemini.");
       }
     } catch (err) {
       triggerAlert("error", "Error de red conectando con Gemini.");
@@ -4080,6 +4171,53 @@ export default function App() {
                   />
                 </div>
 
+                {/* Objetivos Nutricionales (Macros) */}
+                <div className="space-y-3 bg-white/5 border border-white/10 rounded-xl p-4">
+                  <span className="text-xs font-bold text-slate-200 block uppercase tracking-wider flex items-center gap-1.5">🎯 Ajustar Macronutrientes Objetivos (Opcional)</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-emerald-200 block mb-1">Calorías (kcal)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 500"
+                        value={macroCal}
+                        onChange={(e) => setMacroCal(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full bg-white/10 placeholder-emerald-200/50 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:bg-white/20 transition-all font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-emerald-200 block mb-1">Proteínas (g)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 30"
+                        value={macroProt}
+                        onChange={(e) => setMacroProt(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full bg-white/10 placeholder-emerald-200/50 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:bg-white/20 transition-all font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-emerald-200 block mb-1">Carbos (g)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50"
+                        value={macroCarb}
+                        onChange={(e) => setMacroCarb(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full bg-white/10 placeholder-emerald-200/50 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:bg-white/20 transition-all font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-emerald-200 block mb-1">Grasas (g)</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 15"
+                        value={macroFat}
+                        onChange={(e) => setMacroFat(e.target.value === "" ? "" : Number(e.target.value))}
+                        className="w-full bg-white/10 placeholder-emerald-200/50 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:bg-white/20 transition-all font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {/* Ingredientes exclusivos y caducidad checkboxes */}
                 <div className="pt-1 space-y-2.5">
                   <label className="flex items-center gap-2.5 text-xs font-bold text-slate-100 cursor-pointer select-none">
@@ -4147,15 +4285,15 @@ export default function App() {
                     onClick={() => handleGenerateRecipeWithIA(false)}
                     className="bg-white text-emerald-800 disabled:bg-emerald-200 font-bold px-6 py-3 rounded-xl text-sm shadow-md flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
                   >
-                    {generatingRecipe ? (
+                    {generatingRecipe && !selectedProposal ? (
                       <>
                         <RefreshCw className="w-4 h-4 animate-spin text-emerald-700" />
-                        Amasando ingredientes y redactando...
+                        Ideando propuestas culinarias...
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4 text-emerald-600" />
-                        Formular Receta IA 🪄
+                        Formular Propuestas IA 🪄
                       </>
                     )}
                   </button>
@@ -4202,6 +4340,96 @@ export default function App() {
                       Digerir e Importar con IA
                     </button>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* LISTA DE PROPUESTAS DE RECETAS (PASO 1) */}
+            {recipeProposals && !generatedRecipeDraft && (
+              <div className="space-y-6 animate-fade-in bg-white/60 border border-slate-200/80 p-6 rounded-2xl shadow-xs">
+                <div className="border-b border-slate-200 pb-2">
+                  <h3 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
+                    💡 Selecciona una propuesta del Chef IA
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Nuestro motor Gemini ha ideado 3 opciones diferentes basadas en tu despensa y tus objetivos nutricionales. Elige tu favorita para redactar la receta completa:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {recipeProposals.map((proposal: any, idx: number) => {
+                    let cardBorder = "border-emerald-250 bg-emerald-50/20";
+                    let badgeBg = "bg-emerald-100 text-emerald-800 border-emerald-300";
+                    let typeLabel = "🍂 Aprovechamiento";
+                    
+                    if (proposal.type === "supermercado") {
+                      cardBorder = "border-amber-250 bg-amber-50/20";
+                      badgeBg = "bg-amber-100 text-amber-800 border-amber-300";
+                      typeLabel = "🛒 Súper Compra";
+                    } else if (proposal.type === "innovar") {
+                      cardBorder = "border-violet-250 bg-violet-50/20";
+                      badgeBg = "bg-violet-100 text-violet-800 border-violet-300";
+                      typeLabel = "✨ Innovación";
+                    }
+
+                    return (
+                      <div 
+                        key={idx} 
+                        className={`border rounded-2xl p-5 flex flex-col justify-between space-y-4 hover:shadow-md hover:scale-[1.01] transition-all duration-300 ${cardBorder} relative overflow-hidden group`}
+                      >
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className={`text-[10px] uppercase font-black px-2.5 py-0.5 rounded-full border ${badgeBg}`}>
+                              {typeLabel}
+                            </span>
+                          </div>
+                          
+                          <div>
+                            <span className="text-[10px] font-bold text-slate-400 block tracking-wider mb-0.5 uppercase">{proposal.tagline}</span>
+                            <h4 className="text-base font-extrabold text-slate-800 group-hover:text-amber-800 transition-colors leading-tight">
+                              {proposal.title}
+                            </h4>
+                          </div>
+
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            {proposal.description}
+                          </p>
+
+                          {proposal.missingIngredients && proposal.missingIngredients.length > 0 && (
+                            <div className="space-y-1.5 pt-1">
+                              <span className="text-[10px] font-bold text-slate-400 block uppercase tracking-wider">A comprar / Añadir:</span>
+                              <div className="flex flex-wrap gap-1">
+                                {proposal.missingIngredients.map((ing: string, i: number) => (
+                                  <span key={i} className="text-[9px] font-bold bg-rose-50/50 border border-rose-100 text-rose-600 px-2 py-0.5 rounded-md flex items-center gap-0.5">
+                                    + {ing}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            onClick={() => handleExpandProposal(proposal)}
+                            disabled={generatingRecipe}
+                            className="w-full bg-slate-900 hover:bg-slate-850 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:bg-slate-300"
+                          >
+                            {generatingRecipe && selectedProposal?.title === proposal.title ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                Redactando receta...
+                              </>
+                            ) : (
+                              <>
+                                Cocinar esta receta 🍳
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -4253,19 +4481,40 @@ export default function App() {
                 </div>
 
                 <div className="flex justify-end gap-3 border-t border-amber-200 pt-4 flex-wrap">
+                  {recipeProposals && (
+                    <button
+                      onClick={() => {
+                        setGeneratedRecipeDraft(null);
+                        setSelectedProposal(null);
+                      }}
+                      className="bg-slate-150 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 shadow-3xs active:scale-95 transition-all cursor-pointer mr-auto"
+                    >
+                      🔙 Volver a propuestas
+                    </button>
+                  )}
                   {generatedRecipeDraft._cached && (
                     <button
-                      onClick={() => handleGenerateRecipeWithIA(true)}
-                      className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1 shadow-3xs active:scale-95 transition-all cursor-pointer mr-auto"
+                      onClick={() => {
+                        if (selectedProposal) {
+                          handleExpandProposal(selectedProposal, true);
+                        } else {
+                          handleGenerateRecipeWithIA(true);
+                        }
+                      }}
+                      className="bg-amber-100 hover:bg-amber-200 text-amber-800 font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1 shadow-3xs active:scale-95 transition-all cursor-pointer"
                     >
                       <RefreshCw className="w-3.5 h-3.5" /> Forzar Nueva Generación IA
                     </button>
                   )}
                   <button
-                    onClick={() => setGeneratedRecipeDraft(null)}
+                    onClick={() => {
+                      setGeneratedRecipeDraft(null);
+                      setSelectedProposal(null);
+                      setRecipeProposals(null);
+                    }}
                     className="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-4 py-2 rounded-lg text-xs"
                   >
-                    Descartar receta borrador
+                    Descartar
                   </button>
                   <button
                     onClick={handleSaveRecipeDraft}
