@@ -9,6 +9,7 @@ import { MacroGoals, Macros } from "./types/database";
 import MealPlannerTab from "./components/MealPlannerTab";
 import LiveCookingModal from "./components/LiveCookingModal";
 import TicketScannerModal from "./components/TicketScannerModal";
+import { Language, translations } from "./i18n";
 import {
   CookingPot,
   Plus,
@@ -1006,6 +1007,27 @@ export default function App() {
       }
     }
   }, []);
+
+  // --- IDIOMA / INTERNACIONALIZACIÓN ---
+  const [lang, setLang] = useState<Language>(() => {
+    const saved = localStorage.getItem("despensia_language");
+    if (saved === "es" || saved === "en" || saved === "ca" || saved === "gl") {
+      return saved as Language;
+    }
+    const browserLang = navigator.language.substring(0, 2);
+    if (browserLang === "ca") return "ca";
+    if (browserLang === "gl") return "gl";
+    if (browserLang === "en") return "en";
+    return "es";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("despensia_language", lang);
+  }, [lang]);
+
+  const t = (key: string): string => {
+    return translations[lang]?.[key] || translations["es"]?.[key] || key;
+  };
 
   // (Estados y auto-guardado de Lista de la Compra se movieron al principio del componente)
 
@@ -2625,27 +2647,39 @@ export default function App() {
               </div>
               <span className="text-xl font-black tracking-tight text-white">Despensia</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Selector de idioma */}
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value as Language)}
+                className="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer hover:text-white hover:bg-slate-750 transition-colors font-semibold"
+              >
+                <option value="es">Español</option>
+                <option value="en">English</option>
+                <option value="ca">Català</option>
+                <option value="gl">Galego</option>
+              </select>
+
               <a
                 href="#about-us"
                 className="text-xs font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wider"
               >
-                Quiénes Somos
+                {t("aboutUs")}
               </a>
               <button
                 onClick={() => {
                   setGuestMode(true);
-                  triggerAlert("info", "Has entrado en Modo Invitado. Los datos se guardarán localmente.");
+                  triggerAlert("info", lang === "es" ? "Has entrado en Modo Invitado. Los datos se guardarán localmente." : lang === "en" ? "You entered Guest Mode. Data will be saved locally." : lang === "ca" ? "Has entrat en Mode Convidat. Les dades es desaran localment." : "Entraches en Modo Invitado. Os datos gardaranse localmente.");
                 }}
-                className="text-xs font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wider cursor-pointer"
+                className="text-xs font-bold text-slate-400 hover:text-white transition-colors uppercase tracking-wider cursor-pointer bg-transparent border-0"
               >
-                Probar Demo Local
+                {t("demoMode")}
               </button>
               <a
                 href="#auth-panel"
-                className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-extrabold px-4.5 py-2 rounded-xl shadow-md transition-all uppercase tracking-wider"
+                className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-extrabold px-4.5 py-2 rounded-xl shadow-md transition-all uppercase tracking-wider text-center"
               >
-                Comenzar gratis
+                {t("startFree")}
               </a>
             </div>
           </div>
@@ -2664,16 +2698,16 @@ export default function App() {
               <div className="lg:col-span-7 space-y-8 text-center lg:text-left">
                 <div className="inline-flex items-center gap-2 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1 rounded-full text-emerald-400 text-xs font-semibold">
                   <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Potenciado con Gemini AI</span>
+                  <span>{t("heroBadge")}</span>
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white leading-tight tracking-tight">
-                  Escanea tu compra. <br />
+                  {t("heroTitle")} <br />
                   <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">
-                    Cocina con lo que tienes.
+                    {t("heroSub")}
                   </span>
                 </h1>
                 <p className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto lg:mx-0 leading-relaxed font-medium">
-                  Despensia lee tus tickets de supermercado, gestiona tu stock automáticamente y te propone recetas inteligentes con Inteligencia Artificial. Ahorra tiempo, reduce el desperdicio y simplifica tu día a día.
+                  {t("heroDesc")}
                 </p>
 
                 <div className="flex flex-wrap gap-4 justify-center lg:justify-start">
@@ -2681,17 +2715,17 @@ export default function App() {
                     href="#auth-panel"
                     className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-sm px-8 py-4 rounded-xl shadow-lg hover:shadow-emerald-900/20 transition-all flex items-center gap-2 group"
                   >
-                    <span>Comenzar gratis (Nube)</span>
+                    <span>{t("heroCloudCTA")}</span>
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </a>
                   <button
                     onClick={() => {
                       setGuestMode(true);
-                      triggerAlert("info", "Has entrado en Modo Invitado. Los datos se guardarán localmente.");
+                      triggerAlert("info", lang === "es" ? "Has entrado en Modo Invitado. Los datos se guardarán localmente." : lang === "en" ? "You entered Guest Mode. Data will be saved locally." : lang === "ca" ? "Has entrat en Mode Convidat. Les dades es desaran localment." : "Entraches en Modo Invitado. Os datos gardaranse localmente.");
                     }}
                     className="bg-slate-800/80 hover:bg-slate-850 active:scale-95 text-slate-200 font-bold text-sm px-6 py-4 rounded-xl border border-slate-700/60 transition-all shadow-sm cursor-pointer"
                   >
-                    Probar Demo sin Registro
+                    {t("heroLocalCTA")}
                   </button>
                 </div>
 
@@ -3110,6 +3144,17 @@ export default function App() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto justify-end">
+            {/* Selector de idioma */}
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as Language)}
+              className="bg-white text-slate-700 border border-slate-200 rounded-lg text-xs px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer hover:bg-slate-50 transition-colors font-semibold"
+            >
+              <option value="es">Español</option>
+              <option value="en">English</option>
+              <option value="ca">Català</option>
+              <option value="gl">Galego</option>
+            </select>
             {/* CONTROL DE SINCRONIZACIÓN CLOUD / MÓVIL */}
             <div className="flex items-center gap-2">
               {!session?.user && guestMode && (
@@ -3219,7 +3264,7 @@ export default function App() {
             }`}
           >
             <CookingPot className="w-4 h-4" />
-            Gastronomía (Despensa)
+            {t("pantryTab")}
           </button>
           
           <button
@@ -3232,7 +3277,7 @@ export default function App() {
             }`}
           >
             <ChefHat className="w-4 h-4" />
-            Chef IA & Recetario
+            {t("chefTab")}
           </button>
 
           <button
@@ -3245,7 +3290,7 @@ export default function App() {
             }`}
           >
             <Calendar className="w-4 h-4" />
-            Planificador Semanal
+            {t("plannerTab")}
           </button>
         </div>
 
