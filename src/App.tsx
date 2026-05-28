@@ -3027,7 +3027,7 @@ export default function App() {
               <span className="font-sans font-black text-slate-300">Despensia</span>
             </div>
             <p>Despensia App 🍓 — Desarrollado por <strong>THC Labs</strong>. Proyecto indie y sin financiación externa. Si te gusta, colabora <a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">apoyándonos en Ko-fi</a> o compartiendo la app.</p>
-            <p className="text-[10px] text-slate-600">AI Studio Build 2026. Todos los derechos reservados.</p>
+            <p className="text-[10px] text-slate-600">THC Labs 2026. Todos los derechos reservados.</p>
           </div>
         </footer>
       </div>
@@ -3071,9 +3071,6 @@ export default function App() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-black text-slate-800 tracking-tight">Despensia</h1>
-                <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-emerald-600" /> IA Powered
-                </span>
                 {activePantry && (
                   <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                     <Warehouse className="w-3 h-3 text-emerald-600" /> {activePantry.name}
@@ -5086,7 +5083,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 space-y-1.5">
           <p>Despensia App 🍓 — Desarrollado por <strong>THC Labs</strong>.</p>
           <p className="text-[10px] text-slate-450 leading-relaxed">Este es un proyecto independiente (indie) desarrollado sin financiación. Si te gusta y deseas colaborar, ¡<a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline font-bold">apóyanos en Ko-fi</a> o comparte la app!</p>
-          <p className="text-[9px] text-slate-300">AI Studio Build 2026. Todos los derechos reservados.</p>
+          <p className="text-[9px] text-slate-300">THC Labs 2026. Todos los derechos reservados.</p>
         </div>
       </footer>
 
