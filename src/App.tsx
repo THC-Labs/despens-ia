@@ -2777,15 +2777,24 @@ export default function App() {
                   Al ser un proyecto indie, cada grano de arena cuenta muchísimo para nosotros. Puedes apoyarnos de las siguientes formas:
                 </p>
                 <ul className="text-xs text-slate-350 space-y-2 list-disc list-inside">
+                  <li><strong>Apóyanos económicamente</strong>: Hemos creado un perfil en <a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">Ko-fi</a> para ayudarnos a cubrir costes de servidor e IA (Gemini).</li>
                   <li><strong>Usa la aplicación y cuéntanos tu experiencia</strong>: Envíanos tus opiniones, reportes de bugs o sugerencias de mejora.</li>
                   <li><strong>Comparte el proyecto</strong>: Recomiéndanos a tus amigos, familiares o en redes sociales. El boca a boca es nuestro mayor motor de crecimiento.</li>
-                  <li><strong>Colabora activamente</strong>: Si eres desarrollador, diseñador, creador de contenido o simplemente quieres aportar ideas, ¡nos encantaría trabajar contigo!</li>
+                  <li><strong>Colabora activamente</strong>: Si eres desarrollador, diseñador o creador de contenido, ¡nos encantaría trabajar contigo!</li>
                 </ul>
               </div>
-              <div className="pt-2">
+              <div className="pt-2 flex flex-wrap gap-4 justify-center">
+                <a 
+                  href="https://ko-fi.com/thclabs" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-amber-600 hover:bg-amber-500 active:scale-95 text-white font-extrabold text-xs px-6 py-3.5 rounded-xl shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
+                >
+                  ☕ Apóyanos en Ko-fi
+                </a>
                 <a 
                   href="mailto:contact@thclabs.co" 
-                  className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs px-6 py-3 rounded-xl shadow-md transition-all inline-flex items-center gap-2 cursor-pointer"
+                  className="bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 font-extrabold text-xs px-6 py-3.5 rounded-xl border border-slate-700 transition-all inline-flex items-center gap-2 cursor-pointer"
                 >
                   ✉️ Contactar con THC Labs
                 </a>
@@ -2911,7 +2920,7 @@ export default function App() {
               <CookingPot className="w-4 h-4 text-emerald-500 animate-bounce" />
               <span className="font-sans font-black text-slate-300">Despensia</span>
             </div>
-            <p>Despensia App 🍓 — Desarrollado por <strong>THC Labs</strong>. Proyecto indie y sin financiación externa. Si te gusta, colabora compartiéndola o aportando feedback.</p>
+            <p>Despensia App 🍓 — Desarrollado por <strong>THC Labs</strong>. Proyecto indie y sin financiación externa. Si te gusta, colabora <a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">apoyándonos en Ko-fi</a> o compartiendo la app.</p>
             <p className="text-[10px] text-slate-600">AI Studio Build 2026. Todos los derechos reservados.</p>
           </div>
         </footer>
@@ -4790,7 +4799,7 @@ export default function App() {
       <footer className="bg-white border-t border-slate-100 py-6 mt-16 text-center text-xs text-slate-400 font-medium font-mono">
         <div className="max-w-7xl mx-auto px-4 space-y-1.5">
           <p>Despensia App 🍓 — Desarrollado por <strong>THC Labs</strong>.</p>
-          <p className="text-[10px] text-slate-450 leading-relaxed">Este es un proyecto independiente (indie) desarrollado sin financiación. Si te gusta y deseas colaborar o darnos feedback, ¡escríbenos o comparte la app!</p>
+          <p className="text-[10px] text-slate-450 leading-relaxed">Este es un proyecto independiente (indie) desarrollado sin financiación. Si te gusta y deseas colaborar, ¡<a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline font-bold">apóyanos en Ko-fi</a> o comparte la app!</p>
           <p className="text-[9px] text-slate-300">AI Studio Build 2026. Todos los derechos reservados.</p>
         </div>
       </footer>
