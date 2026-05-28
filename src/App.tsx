@@ -2564,18 +2564,20 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className="pt-4 flex justify-center lg:justify-start items-center gap-6 divide-x divide-slate-800">
-                  <div>
+                <div className="pt-4 flex flex-wrap justify-center lg:justify-start items-center gap-y-4 gap-x-8">
+                  <div className="text-center lg:text-left">
                     <span className="block text-2xl font-extrabold text-white">100%</span>
-                    <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Cero Desperdicio</span>
+                    <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Cero Desperdicio</span>
                   </div>
-                  <div className="pl-6">
+                  <div className="hidden sm:block h-8 w-px bg-slate-800" />
+                  <div className="text-center lg:text-left">
                     <span className="block text-2xl font-extrabold text-white">Gemini</span>
-                    <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Análisis Multimodal</span>
+                    <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Análisis Multimodal</span>
                   </div>
-                  <div className="pl-6">
+                  <div className="hidden sm:block h-8 w-px bg-slate-800" />
+                  <div className="text-center lg:text-left">
                     <span className="block text-2xl font-extrabold text-white">Cloud Sync</span>
-                    <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Acceso en Tiempo Real</span>
+                    <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Acceso en Tiempo Real</span>
                   </div>
                 </div>
               </div>
@@ -2765,22 +2767,18 @@ export default function App() {
               <div className="inline-flex items-center gap-2 bg-emerald-950/60 border border-emerald-800/40 px-3 py-1 rounded-full text-emerald-400 text-xs font-semibold">
                 <span>THC Labs Project</span>
               </div>
-              <h2 className="text-3xl font-black text-white tracking-tight">Desarrollado con 💚 por THC Labs</h2>
-              <p className="text-slate-350 text-sm leading-relaxed">
-                Despensia es un proyecto 100% independiente creado por y para amantes de la cocina inteligente, la eficiencia y el desperdicio cero. Somos un estudio indie, <strong>desarrollamos esta app sin financiación externa ni grandes corporaciones detrás</strong>.
+              <h2 className="text-2xl font-black text-white tracking-tight">Desarrollado por THC Labs</h2>
+              <p className="text-slate-300 text-sm leading-relaxed max-w-xl mx-auto">
+                Despensia es un proyecto independiente (indie) desarrollado sin financiación externa. Nuestro objetivo es crear una herramienta útil, directa y sin rodeos para optimizar tu despensa y reducir el desperdicio.
               </p>
               <div className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800/50 text-left space-y-4 max-w-2xl mx-auto">
                 <h4 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                  🚀 ¿Cómo puedes colaborar?
+                  🚀 ¿Cómo colaborar?
                 </h4>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Al ser un proyecto indie, cada grano de arena cuenta muchísimo para nosotros. Puedes apoyarnos de las siguientes formas:
-                </p>
-                <ul className="text-xs text-slate-350 space-y-2 list-disc list-inside">
-                  <li><strong>Apóyanos económicamente</strong>: Hemos creado un perfil en <a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">Ko-fi</a> para ayudarnos a cubrir costes de servidor e IA (Gemini).</li>
-                  <li><strong>Usa la aplicación y cuéntanos tu experiencia</strong>: Envíanos tus opiniones, reportes de bugs o sugerencias de mejora.</li>
-                  <li><strong>Comparte el proyecto</strong>: Recomiéndanos a tus amigos, familiares o en redes sociales. El boca a boca es nuestro mayor motor de crecimiento.</li>
-                  <li><strong>Colabora activamente</strong>: Si eres desarrollador, diseñador o creador de contenido, ¡nos encantaría trabajar contigo!</li>
+                <ul className="text-xs text-slate-350 space-y-2.5 list-disc list-inside">
+                  <li><strong>Apoyo económico</strong>: Si quieres ayudarnos a mantener los servidores y la API de Gemini, puedes <a href="https://ko-fi.com/thclabs" target="_blank" rel="noopener noreferrer" className="text-emerald-400 hover:underline font-bold">invitarnos a un café en Ko-fi</a>.</li>
+                  <li><strong>Feedback y sugerencias</strong>: Escríbenos con cualquier idea o fallo que detectes para seguir mejorando.</li>
+                  <li><strong>Comparte la app</strong>: Si la app te resulta útil, recomiéndala a tus amigos o familiares.</li>
                 </ul>
               </div>
               <div className="pt-2 flex flex-wrap gap-4 justify-center">
