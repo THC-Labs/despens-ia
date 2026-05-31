@@ -11,10 +11,14 @@ dotenv.config();
 
 const runtimeFilename = typeof __filename !== "undefined" 
   ? __filename 
-  : fileURLToPath(import.meta.url);
+  : (typeof import.meta !== "undefined" && import.meta?.url)
+    ? fileURLToPath(import.meta.url)
+    : "";
 const runtimeDirname = typeof __dirname !== "undefined" 
   ? __dirname 
-  : path.dirname(runtimeFilename);
+  : runtimeFilename 
+    ? path.dirname(runtimeFilename) 
+    : process.cwd();
 const dbPath = process.env.VERCEL
   ? path.join("/tmp", "db.json")
   : path.join(runtimeDirname, "db.json");
