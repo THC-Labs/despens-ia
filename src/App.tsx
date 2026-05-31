@@ -4561,6 +4561,14 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
                     placeholder="Escribe 'baja en grasas', 'sin freír', 'apto para niños', 'añade un toque de curry'..."
                     value={chefExtraPrompt}
                     onChange={(e) => setChefExtraPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (!generatingRecipe && (geminiUsage === null || geminiUsage.remaining > 0)) {
+                          handleGenerateRecipeWithIA();
+                        }
+                      }
+                    }}
                     className="w-full bg-white/10 placeholder-emerald-200/75 border border-white/25 border-emerald-400 rounded-lg p-3 text-sm focus:outline-none focus:bg-white/25 transition-all text-white"
                   />
                 </div>
@@ -4576,6 +4584,14 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
                         placeholder="e.g. 500"
                         value={macroCal}
                         onChange={(e) => setMacroCal(e.target.value === "" ? "" : Number(e.target.value))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (!generatingRecipe && (geminiUsage === null || geminiUsage.remaining > 0)) {
+                              handleGenerateRecipeWithIA();
+                            }
+                          }
+                        }}
                         className="w-full bg-white/10 placeholder-emerald-200/50 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:bg-white/20 transition-all font-mono"
                       />
                     </div>
@@ -4586,6 +4602,14 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
                         placeholder="e.g. 30"
                         value={macroProt}
                         onChange={(e) => setMacroProt(e.target.value === "" ? "" : Number(e.target.value))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (!generatingRecipe && (geminiUsage === null || geminiUsage.remaining > 0)) {
+                              handleGenerateRecipeWithIA();
+                            }
+                          }
+                        }}
                         className="w-full bg-white/10 placeholder-emerald-200/50 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:bg-white/20 transition-all font-mono"
                       />
                     </div>
@@ -4596,6 +4620,14 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
                         placeholder="e.g. 50"
                         value={macroCarb}
                         onChange={(e) => setMacroCarb(e.target.value === "" ? "" : Number(e.target.value))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (!generatingRecipe && (geminiUsage === null || geminiUsage.remaining > 0)) {
+                              handleGenerateRecipeWithIA();
+                            }
+                          }
+                        }}
                         className="w-full bg-white/10 placeholder-emerald-200/50 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:bg-white/20 transition-all font-mono"
                       />
                     </div>
@@ -4606,6 +4638,14 @@ Asegúrate de responder en español y de que el JSON sea sintácticamente válid
                         placeholder="e.g. 15"
                         value={macroFat}
                         onChange={(e) => setMacroFat(e.target.value === "" ? "" : Number(e.target.value))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            if (!generatingRecipe && (geminiUsage === null || geminiUsage.remaining > 0)) {
+                              handleGenerateRecipeWithIA();
+                            }
+                          }
+                        }}
                         className="w-full bg-white/10 placeholder-emerald-200/50 border border-white/20 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:bg-white/20 transition-all font-mono"
                       />
                     </div>
