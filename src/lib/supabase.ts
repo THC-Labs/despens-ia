@@ -5,13 +5,13 @@ import { Database } from '../types/database';
 // Nota: En Next.js (App Router), las variables expuestas al navegador deben llevar el prefijo NEXT_PUBLIC_.
 // Si se utiliza Vite, se usa import.meta.env.VITE_SUPABASE_URL.
 const supabaseUrl = 
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_URL) ||
+  (typeof import.meta !== 'undefined' && ((import.meta as any).env?.VITE_SUPABASE_URL || (import.meta as any).env?.NEXT_PUBLIC_SUPABASE_URL)) ||
   (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_URL) || 
   (typeof window !== 'undefined' ? (window as any)._env_?.NEXT_PUBLIC_SUPABASE_URL : '') ||
   'https://your-project-id.supabase.co';
 
 const supabaseAnonKey = 
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_SUPABASE_ANON_KEY) ||
+  (typeof import.meta !== 'undefined' && ((import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (import.meta as any).env?.NEXT_PUBLIC_SUPABASE_ANON_KEY)) ||
   (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_SUPABASE_ANON_KEY) || 
   (typeof window !== 'undefined' ? (window as any)._env_?.NEXT_PUBLIC_SUPABASE_ANON_KEY : '') ||
   'your-anon-key-placeholder';

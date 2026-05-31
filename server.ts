@@ -42,6 +42,15 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 app.use(express.json());
 
+// Middleware para Vercel: restaurar la URL original desde x-matched-path si está disponible
+app.use((req, res, next) => {
+  const matchedPath = req.headers["x-matched-path"];
+  if (matchedPath) {
+    req.url = typeof matchedPath === "string" ? matchedPath : matchedPath[0];
+  }
+  next();
+});
+
 // Inicializar base de datos local JSON si no existe
 const defaultDb = {
   inventory: [
